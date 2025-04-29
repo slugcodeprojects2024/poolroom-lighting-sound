@@ -114,7 +114,7 @@ class Camera {
      */
     rotateLeft(angle) {
         // Create rotation matrix
-        const rotationMatrix = createRotationYMatrix(angle); // Removed negative sign
+        const rotationMatrix = createRotationYMatrix(-angle); // Adding negative sign here
         
         // Apply rotation to front vector
         const rotatedFront = transformVector(rotationMatrix, this.front);
