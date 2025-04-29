@@ -128,7 +128,7 @@ class Camera {
      * @param {number} angle - Angle in radians
      */
     rotateRight(angle) {
-        this.rotateLeft(angle); // This calls rotateLeft with negative angle
+        this.rotateLeft(-angle); // This calls rotateLeft with negative angle
     }
     
     /**
