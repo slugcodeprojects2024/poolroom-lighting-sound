@@ -130,6 +130,76 @@ class Camera {
     rotateRight(angle) {
         this.rotateLeft(-angle);
     }
+    
+    /**
+     * Check for collision and prevent movement if needed
+     * @param {World} world - World object to check collisions against
+     * @param {Array<number>} newPosition - Potential new position [x, y, z]
+     * @returns {boolean} - Whether movement is allowed
+     */
+    checkCollision(world, newPosition) {
+        return !world.checkCollision(newPosition);
+    }
+
+    /**
+     * Move the camera forward with collision detection
+     * @param {number} distance - Distance to move
+     * @param {World} world - World object to check collisions against
+     */
+    moveForwardWithCollision(distance, world) {
+        // Calculate potential new position
+        const newPosition = [
+            this.position[0] + this.front[0] * distance,
+            this.position[1] + this.front[1] * distance,
+            this.position[2] + this.front[2] * distance
+        ];
+        
+        // Check for collision
+        if (this.checkCollision(world, newPosition)) {
+            this.position = newPosition;
+            this.updateViewMatrix();
+        }
+    }
+
+    /**
+     * Move the camera backward with collision detection
+     * @param {number} distance - Distance to move
+     * @param {World} world - World object to check collisions against
+     */
+    moveBackwardWithCollision(distance, world) {
+        this.moveForwardWithCollision(-distance, world);
+    }
+
+    /**
+     * Move the camera right with collision detection
+     * @param {number} distance - Distance to move
+     * @param {World} world - World object to check collisions against
+     */
+    moveRightWithCollision(distance, world) {
+        const right = normalizeVector(crossProduct(this.front, this.up));
+        
+        // Calculate potential new position
+        const newPosition = [
+            this.position[0] + right[0] * distance,
+            this.position[1] + right[1] * distance,
+            this.position[2] + right[2] * distance
+        ];
+        
+        // Check for collision
+        if (this.checkCollision(world, newPosition)) {
+            this.position = newPosition;
+            this.updateViewMatrix();
+        }
+    }
+
+    /**
+     * Move the camera left with collision detection
+     * @param {number} distance - Distance to move
+     * @param {World} world - World object to check collisions against
+     */
+    moveLeftWithCollision(distance, world) {
+        this.moveRightWithCollision(-distance, world);
+    }
 }
 
 // Vector helper functions

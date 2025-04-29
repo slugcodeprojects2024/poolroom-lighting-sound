@@ -6,6 +6,7 @@ class Engine {
         this.cube = null;
         this.camera = null;
         this.input = null;
+        this.world = null;  // Add world property
         this.lastFrameTime = 0;
         this.running = false;
         
@@ -29,6 +30,9 @@ class Engine {
         
         // Create cube
         this.cube = new Cube(this.gl);
+        
+        // Create world
+        this.world = new World();
         
         // Create camera
         this.camera = new Camera();
@@ -134,8 +138,6 @@ class Engine {
     
     /**
      * Update game state
-     * @param {number} deltaTime - Time since last frame in seconds/**
-     * Update game state
      * @param {number} deltaTime - Time since last frame in seconds
      */
     update(deltaTime) {
@@ -146,23 +148,23 @@ class Engine {
         const moveSpeed = 2.5 * deltaTime;
         const rotateSpeed = 1.5 * deltaTime;
         
-        // Forward/backward movement
+        // Forward/backward movement with collision detection
         if (this.input.isKeyPressed('KeyW')) {
-            this.camera.moveForward(moveSpeed);
+            this.camera.moveForwardWithCollision(moveSpeed, this.world);
         }
         if (this.input.isKeyPressed('KeyS')) {
-            this.camera.moveBackward(moveSpeed);
+            this.camera.moveBackwardWithCollision(moveSpeed, this.world);
         }
         
-        // Left/right movement
+        // Left/right movement with collision detection
         if (this.input.isKeyPressed('KeyA')) {
-            this.camera.moveLeft(moveSpeed);
+            this.camera.moveLeftWithCollision(moveSpeed, this.world);
         }
         if (this.input.isKeyPressed('KeyD')) {
-            this.camera.moveRight(moveSpeed);
+            this.camera.moveRightWithCollision(moveSpeed, this.world);
         }
         
-        // Rotation
+        // Rotation (no collision detection needed)
         if (this.input.isKeyPressed('KeyQ')) {
             this.camera.rotateLeft(rotateSpeed);
         }
