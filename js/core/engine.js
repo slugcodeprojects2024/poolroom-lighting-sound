@@ -6,7 +6,7 @@ class Engine {
         this.cube = null;
         this.camera = null;
         this.input = null;
-        this.world = null;  // Add world property
+        this.world = null;
         this.lastFrameTime = 0;
         this.running = false;
         
@@ -31,9 +31,6 @@ class Engine {
         // Create cube
         this.cube = new Cube(this.gl);
         
-        // Create world
-        this.world = new World();
-        
         // Create camera
         this.camera = new Camera();
         this.camera.position = [0, 0, 5];
@@ -42,6 +39,17 @@ class Engine {
         
         // Create input manager
         this.input = new InputManager();
+        this.input.init(this.canvas);
+        
+        // Create world
+        try {
+            console.log("Creating world...");
+            this.world = new World(this.gl);
+            console.log("World created successfully");
+        } catch (error) {
+            console.error("Error creating world:", error);
+            this.world = null;
+        }
         
         // Hide loading screen
         document.getElementById('loading-screen').classList.add('hidden');
@@ -144,27 +152,52 @@ class Engine {
         // Check for resize
         this.resize();
         
+        // Handle mouse look
+        const mouseSensitivity = 0.003;  // Adjust as needed
+        const mouseMovement = this.input.getMouseMovement();
+        
+        if (mouseMovement.x !== 0 || mouseMovement.y !== 0) {
+            this.camera.lookLeftRight(mouseMovement.x * mouseSensitivity);
+            this.camera.lookUpDown(mouseMovement.y * mouseSensitivity);
+        }
+        
         // Handle camera movement
         const moveSpeed = 2.5 * deltaTime;
         const rotateSpeed = 1.5 * deltaTime;
         
-        // Forward/backward movement with collision detection
+        // Forward/backward movement with collision detection if world exists
         if (this.input.isKeyPressed('KeyW')) {
-            this.camera.moveForwardWithCollision(moveSpeed, this.world);
+            if (this.world) {
+                this.camera.moveForwardWithCollision(moveSpeed, this.world);
+            } else {
+                this.camera.moveForward(moveSpeed);
+            }
         }
         if (this.input.isKeyPressed('KeyS')) {
-            this.camera.moveBackwardWithCollision(moveSpeed, this.world);
+            if (this.world) {
+                this.camera.moveBackwardWithCollision(moveSpeed, this.world);
+            } else {
+                this.camera.moveBackward(moveSpeed);
+            }
         }
         
-        // Left/right movement with collision detection
+        // Left/right movement with collision detection if world exists
         if (this.input.isKeyPressed('KeyA')) {
-            this.camera.moveLeftWithCollision(moveSpeed, this.world);
+            if (this.world) {
+                this.camera.moveLeftWithCollision(moveSpeed, this.world);
+            } else {
+                this.camera.moveLeft(moveSpeed);
+            }
         }
         if (this.input.isKeyPressed('KeyD')) {
-            this.camera.moveRightWithCollision(moveSpeed, this.world);
+            if (this.world) {
+                this.camera.moveRightWithCollision(moveSpeed, this.world);
+            } else {
+                this.camera.moveRight(moveSpeed);
+            }
         }
         
-        // Rotation (no collision detection needed)
+        // Rotation (keyboard as backup to mouse)
         if (this.input.isKeyPressed('KeyQ')) {
             this.camera.rotateLeft(rotateSpeed);
         }
@@ -219,7 +252,7 @@ class Engine {
             FPS: ${fps}<br>
             Position: ${position}<br>
             Direction: ${front}<br>
-            Controls: WASD - Move, QE - Rotate
+            Controls: WASD - Move, Mouse/QE - Look
         `;
     }
 }

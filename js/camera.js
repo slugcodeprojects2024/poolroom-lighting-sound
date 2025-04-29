@@ -11,6 +11,10 @@ class Camera {
         this.front = [0, 0, -1];       // Direction the camera is looking
         this.up = [0, 1, 0];           // Up vector
         
+        // Orientation angles
+        this.yaw = -90;                // Horizontal rotation (degrees)
+        this.pitch = 0;                // Vertical rotation (degrees)
+        
         // Matrices
         this.viewMatrix = createTransformationMatrix();
         this.projectionMatrix = createTransformationMatrix();
@@ -114,7 +118,7 @@ class Camera {
      */
     rotateLeft(angle) {
         // Create rotation matrix
-        const rotationMatrix = createRotationYMatrix(-angle); // Adding negative sign here
+        const rotationMatrix = createRotationYMatrix(-angle); // Negative for correct direction
         
         // Apply rotation to front vector
         const rotatedFront = transformVector(rotationMatrix, this.front);
@@ -128,7 +132,58 @@ class Camera {
      * @param {number} angle - Angle in radians
      */
     rotateRight(angle) {
-        this.rotateLeft(-angle); // This calls rotateLeft with negative angle
+        this.rotateLeft(-angle);
+    }
+    
+    /**
+     * Look up and down (pitch)
+     * @param {number} amount - Amount to look up/down in radians
+     */
+    lookUpDown(amount) {
+        // Convert amount to degrees for easier constraints
+        const degreesAmount = amount * (180 / Math.PI);
+        
+        // Update pitch with constraints (-89 to 89 degrees)
+        this.pitch = Math.max(-89, Math.min(89, this.pitch - degreesAmount));
+        
+        // Update front vector based on yaw and pitch
+        this.updateFrontVector();
+    }
+    
+    /**
+     * Look left and right (yaw)
+     * @param {number} amount - Amount to look left/right in radians
+     */
+    lookLeftRight(amount) {
+        // Convert amount to degrees
+        const degreesAmount = amount * (180 / Math.PI);
+        
+        // Update yaw
+        this.yaw = (this.yaw + degreesAmount) % 360;
+        
+        // Update front vector based on yaw and pitch
+        this.updateFrontVector();
+    }
+    
+    /**
+     * Update front vector based on yaw and pitch angles
+     */
+    updateFrontVector() {
+        // Convert angles to radians
+        const yawRad = this.yaw * (Math.PI / 180);
+        const pitchRad = this.pitch * (Math.PI / 180);
+        
+        // Calculate front vector
+        this.front = [
+            Math.cos(yawRad) * Math.cos(pitchRad),
+            Math.sin(pitchRad),
+            Math.sin(yawRad) * Math.cos(pitchRad)
+        ];
+        
+        // Normalize front vector
+        this.front = normalizeVector(this.front);
+        
+        this.updateViewMatrix();
     }
     
     /**
@@ -140,7 +195,7 @@ class Camera {
     checkCollision(world, newPosition) {
         return !world.checkCollision(newPosition);
     }
-
+    
     /**
      * Move the camera forward with collision detection
      * @param {number} distance - Distance to move
@@ -160,7 +215,7 @@ class Camera {
             this.updateViewMatrix();
         }
     }
-
+    
     /**
      * Move the camera backward with collision detection
      * @param {number} distance - Distance to move
@@ -169,7 +224,7 @@ class Camera {
     moveBackwardWithCollision(distance, world) {
         this.moveForwardWithCollision(-distance, world);
     }
-
+    
     /**
      * Move the camera right with collision detection
      * @param {number} distance - Distance to move
@@ -191,7 +246,7 @@ class Camera {
             this.updateViewMatrix();
         }
     }
-
+    
     /**
      * Move the camera left with collision detection
      * @param {number} distance - Distance to move

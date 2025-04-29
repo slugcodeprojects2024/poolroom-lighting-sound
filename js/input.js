@@ -6,6 +6,8 @@ class InputManager {
         this.mouseDeltaX = 0;
         this.mouseDeltaY = 0;
         this.mouseButtons = [false, false, false];
+        this.isPointerLocked = false;
+        this.canvas = null;
         
         this.setupEventListeners();
     }
@@ -23,21 +25,38 @@ class InputManager {
             this.keys[e.code] = false;
         });
         
+        // Mouse pointer lock
+        document.addEventListener('pointerlockchange', () => {
+            this.isPointerLocked = document.pointerLockElement === this.canvas;
+        });
+        
         // Mouse movement
-        window.addEventListener('mousemove', (e) => {
-            const newX = e.clientX;
-            const newY = e.clientY;
-            
-            this.mouseDeltaX = newX - this.mouseX;
-            this.mouseDeltaY = newY - this.mouseY;
-            
-            this.mouseX = newX;
-            this.mouseY = newY;
+        document.addEventListener('mousemove', (e) => {
+            if (this.isPointerLocked) {
+                // Use movementX/Y for pointer lock (preferred for games)
+                this.mouseDeltaX = e.movementX;
+                this.mouseDeltaY = e.movementY;
+            } else {
+                // Fall back to position tracking
+                const newX = e.clientX;
+                const newY = e.clientY;
+                
+                this.mouseDeltaX = newX - this.mouseX;
+                this.mouseDeltaY = newY - this.mouseY;
+                
+                this.mouseX = newX;
+                this.mouseY = newY;
+            }
         });
         
         // Mouse buttons
         window.addEventListener('mousedown', (e) => {
             this.mouseButtons[e.button] = true;
+            
+            // Request pointer lock on click if canvas exists
+            if (this.canvas && !this.isPointerLocked) {
+                this.canvas.requestPointerLock();
+            }
         });
         
         window.addEventListener('mouseup', (e) => {
@@ -48,6 +67,20 @@ class InputManager {
         window.addEventListener('contextmenu', (e) => {
             e.preventDefault();
         });
+    }
+    
+    /**
+     * Initialize with canvas for pointer lock
+     * @param {HTMLCanvasElement} canvas - Game canvas element
+     */
+    init(canvas) {
+        this.canvas = canvas;
+        
+        // Set up pointer lock API compatibility
+        this.canvas.requestPointerLock = this.canvas.requestPointerLock ||
+                                          this.canvas.mozRequestPointerLock;
+        document.exitPointerLock = document.exitPointerLock ||
+                                    document.mozExitPointerLock;
     }
     
     /**
@@ -74,8 +107,8 @@ class InputManager {
      */
     getMouseMovement() {
         const movement = {
-            deltaX: this.mouseDeltaX,
-            deltaY: this.mouseDeltaY
+            x: this.mouseDeltaX,
+            y: this.mouseDeltaY
         };
         
         // Reset deltas for next frame
