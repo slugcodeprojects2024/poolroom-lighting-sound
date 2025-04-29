@@ -127,8 +127,8 @@ class Camera {
      * Rotate the camera right around the Y axis
      * @param {number} angle - Angle in radians
      */
-    rotateRight(angle) {
-        this.rotateLeft(-angle);
+    rotateLeft(angle) {
+        this.rotateRight(-angle);
     }
     
     /**
