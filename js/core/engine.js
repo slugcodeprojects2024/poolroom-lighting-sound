@@ -45,6 +45,12 @@ class Engine {
         try {
             console.log("Creating world...");
             this.world = new World(this.gl);
+            this.world.generateTestWorld();
+            
+            // Position camera above water
+            this.camera.position = [16, 3, 16]; // Center of the world, above water
+            this.camera.updateViewMatrix();
+            
             console.log("World created successfully");
         } catch (error) {
             console.error("Error creating world:", error);
@@ -222,21 +228,32 @@ class Engine {
         this.shader.setMatrix4('u_viewMatrix', this.camera.viewMatrix);
         this.shader.setMatrix4('u_projectionMatrix', this.camera.projectionMatrix);
         
-        // Create model matrix (rotation and translation)
-        const modelMatrix = createTransformationMatrix();
-        const rotationY = createRotationYMatrix(performance.now() * 0.001);
-        const translation = createTranslationMatrix(0, 0, 0);
-        const scale = createScaleMatrix(1, 1, 1);
+        // Current time for animations
+        const currentTime = performance.now() * 0.001; // Convert to seconds
         
-        // Combine transformations: translation * rotation * scale
-        const tempMatrix = multiplyMatrices(translation, rotationY);
-        const finalModelMatrix = multiplyMatrices(tempMatrix, scale);
-        
-        // Set model matrix
-        this.shader.setMatrix4('u_modelMatrix', finalModelMatrix);
-        
-        // Draw cube
-        this.cube.draw(this.shader);
+        // Draw world if available, otherwise fall back to cube
+        if (this.world) {
+            // Draw the world with current time for animations
+            this.world.draw(this.shader, currentTime);
+        } else {
+            // Fall back to cube if world isn't available
+            
+            // Create model matrix (rotation and translation)
+            const modelMatrix = createTransformationMatrix();
+            const rotationY = createRotationYMatrix(currentTime);
+            const translation = createTranslationMatrix(0, 0, 0);
+            const scale = createScaleMatrix(1, 1, 1);
+            
+            // Combine transformations: translation * rotation * scale
+            const tempMatrix = multiplyMatrices(translation, rotationY);
+            const finalModelMatrix = multiplyMatrices(tempMatrix, scale);
+            
+            // Set model matrix
+            this.shader.setMatrix4('u_modelMatrix', finalModelMatrix);
+            
+            // Draw cube
+            this.cube.draw(this.shader);
+        }
     }
     
     /**

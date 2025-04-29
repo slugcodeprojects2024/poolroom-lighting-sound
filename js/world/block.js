@@ -97,7 +97,6 @@ class Block {
             0.0, 0.0
         ]);
         
-        // For now, we'll use colors as a fallback when textures aren't loaded
         // Colors based on block type
         let colors;
         
@@ -114,19 +113,40 @@ class Block {
             case 'tile':
                 colors = new Float32Array(24 * 4).fill(0);
                 for (let i = 0; i < 24; i++) {
-                    colors[i * 4 + 0] = 0.8;  // R
-                    colors[i * 4 + 1] = 0.9;  // G
-                    colors[i * 4 + 2] = 1.0;  // B
-                    colors[i * 4 + 3] = 1.0;  // A
+                    // Slightly vary the color for different faces
+                    const faceIndex = Math.floor(i / 4);
+                    const brightness = 0.9 + (faceIndex % 3) * 0.03;
+                    
+                    colors[i * 4 + 0] = 0.2 * brightness;  // R
+                    colors[i * 4 + 1] = 0.7 * brightness;  // G
+                    colors[i * 4 + 2] = 0.9 * brightness;  // B
+                    colors[i * 4 + 3] = 1.0;              // A
+                }
+                break;
+            case 'wall':
+                colors = new Float32Array(24 * 4).fill(0);
+                for (let i = 0; i < 24; i++) {
+                    // Slightly vary the color for different faces
+                    const faceIndex = Math.floor(i / 4);
+                    const brightness = 0.85 + (faceIndex % 3) * 0.05;
+                    
+                    colors[i * 4 + 0] = 0.4 * brightness;  // R
+                    colors[i * 4 + 1] = 0.8 * brightness;  // G
+                    colors[i * 4 + 2] = 0.9 * brightness;  // B
+                    colors[i * 4 + 3] = 1.0;              // A
                 }
                 break;
             default:
                 colors = new Float32Array(24 * 4).fill(0);
                 for (let i = 0; i < 24; i++) {
-                    colors[i * 4 + 0] = 0.5;  // R
-                    colors[i * 4 + 1] = 0.5;  // G
-                    colors[i * 4 + 2] = 0.5;  // B
-                    colors[i * 4 + 3] = 1.0;  // A
+                    // Slightly vary the color for different faces
+                    const faceIndex = Math.floor(i / 4);
+                    const brightness = 0.8 + (faceIndex % 3) * 0.05;
+                    
+                    colors[i * 4 + 0] = 0.5 * brightness;  // R
+                    colors[i * 4 + 1] = 0.5 * brightness;  // G
+                    colors[i * 4 + 2] = 0.6 * brightness;  // B
+                    colors[i * 4 + 3] = 1.0;              // A
                 }
                 break;
         }
@@ -183,6 +203,16 @@ class Block {
         // Set model matrix
         shader.setMatrix4('u_modelMatrix', modelMatrix);
         
+        // Set block type as uniform (for shader to handle different block types)
+        const blockTypeUniform = shader.getUniformLocation('u_blockType');
+        if (blockTypeUniform !== null) {
+            let typeValue = 0; // default
+            if (this.type === 'water') typeValue = 1;
+            if (this.type === 'tile') typeValue = 2;
+            if (this.type === 'wall') typeValue = 3;
+            gl.uniform1i(blockTypeUniform, typeValue);
+        }
+        
         // Get attribute locations
         const positionAttrib = shader.getAttribLocation('a_position');
         const colorAttrib = shader.getAttribLocation('a_color');
@@ -213,17 +243,19 @@ class Block {
         // Bind index buffer
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         
-        // Set block type as uniform (for shader to handle different block types)
-        const blockTypeUniform = shader.getUniformLocation('u_blockType');
-        if (blockTypeUniform) {
-            let typeValue = 0; // default
-            if (this.type === 'water') typeValue = 1;
-            if (this.type === 'tile') typeValue = 2;
-            gl.uniform1i(blockTypeUniform, typeValue);
+        // Enable alpha blending for transparent blocks
+        if (this.type === 'water') {
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         }
         
         // Draw elements
         gl.drawElements(gl.TRIANGLES, this.numIndices, gl.UNSIGNED_SHORT, 0);
+        
+        // Disable blending after drawing
+        if (this.type === 'water') {
+            gl.disable(gl.BLEND);
+        }
         
         // Clean up
         gl.disableVertexAttribArray(positionAttrib);
