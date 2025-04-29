@@ -74,13 +74,16 @@ class Camera {
     }
     
     /**
-     * Move the camera forward
+     * Move the camera forward (ground-locked)
      * @param {number} distance - Distance to move
      */
     moveForward(distance) {
-        this.position[0] += this.front[0] * distance;
-        this.position[1] += this.front[1] * distance;
-        this.position[2] += this.front[2] * distance;
+        // Only use the XZ components for movement (ignore Y/up-down)
+        const xzFront = normalizeVector([this.front[0], 0, this.front[2]]);
+        
+        this.position[0] += xzFront[0] * distance;
+        // Y position remains unchanged (locked to ground)
+        this.position[2] += xzFront[2] * distance;
         this.updateViewMatrix();
     }
     
@@ -93,13 +96,15 @@ class Camera {
     }
     
     /**
-     * Move the camera right
+     * Move the camera right (ground-locked)
      * @param {number} distance - Distance to move
      */
     moveRight(distance) {
-        const right = normalizeVector(crossProduct(this.front, this.up));
+        const xzFront = normalizeVector([this.front[0], 0, this.front[2]]);
+        const right = normalizeVector(crossProduct(xzFront, this.up));
+        
         this.position[0] += right[0] * distance;
-        this.position[1] += right[1] * distance;
+        // Y position remains unchanged (locked to ground)
         this.position[2] += right[2] * distance;
         this.updateViewMatrix();
     }
@@ -197,16 +202,19 @@ class Camera {
     }
     
     /**
-     * Move the camera forward with collision detection
+     * Move the camera forward with collision detection (ground-locked)
      * @param {number} distance - Distance to move
      * @param {World} world - World object to check collisions against
      */
     moveForwardWithCollision(distance, world) {
+        // Only use the XZ components for movement (ignore Y/up-down)
+        const xzFront = normalizeVector([this.front[0], 0, this.front[2]]);
+        
         // Calculate potential new position
         const newPosition = [
-            this.position[0] + this.front[0] * distance,
-            this.position[1] + this.front[1] * distance,
-            this.position[2] + this.front[2] * distance
+            this.position[0] + xzFront[0] * distance,
+            this.position[1], // Keep Y unchanged
+            this.position[2] + xzFront[2] * distance
         ];
         
         // Check for collision
@@ -226,17 +234,18 @@ class Camera {
     }
     
     /**
-     * Move the camera right with collision detection
+     * Move the camera right with collision detection (ground-locked)
      * @param {number} distance - Distance to move
      * @param {World} world - World object to check collisions against
      */
     moveRightWithCollision(distance, world) {
-        const right = normalizeVector(crossProduct(this.front, this.up));
+        const xzFront = normalizeVector([this.front[0], 0, this.front[2]]);
+        const right = normalizeVector(crossProduct(xzFront, this.up));
         
         // Calculate potential new position
         const newPosition = [
             this.position[0] + right[0] * distance,
-            this.position[1] + right[1] * distance,
+            this.position[1], // Keep Y unchanged
             this.position[2] + right[2] * distance
         ];
         
