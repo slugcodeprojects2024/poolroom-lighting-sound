@@ -13,16 +13,22 @@
         <div id="debug-info"></div>
     </div>
     
-    <!-- Scripts -->
-    <script src="js/shaders/vertex.js"></script>
-    <script src="js/shaders/fragment.js"></script>
-    <script src="js/core/shader.js"></script>
-    <script src="js/core/geometry.js"></script>
-    <script src="js/core/engine.js"></script>
-    <script src="js/camera.js"></script>
-    <script src="js/input.js"></script>
-    <script src="js/main.js"></script>
-    <script src="js/world/block.js"></script>
-    <script src="js/world/world.js"></script>
+  <!-- Scripts -->
+<!-- First load shaders -->
+<script src="js/shaders.js"></script>
+
+<!-- Core utilities and classes -->
+<script src="js/core/geometry.js"></script>
+<script src="js/core/shader.js"></script>
+<script src="js/input.js"></script>
+<script src="js/camera.js"></script>
+
+<!-- World components -->
+<script src="js/world/block.js"></script>
+<script src="js/world/world.js"></script>
+
+<!-- Engine and main (load last) -->
+<script src="js/core/engine.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>
