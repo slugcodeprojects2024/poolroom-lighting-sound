@@ -114,7 +114,7 @@ class Camera {
      */
     rotateLeft(angle) {
         // Create rotation matrix
-        const rotationMatrix = createRotationYMatrix(angle);
+        const rotationMatrix = createRotationYMatrix(-angle); // Reversed angle here
         
         // Apply rotation to front vector
         const rotatedFront = transformVector(rotationMatrix, this.front);
@@ -128,7 +128,7 @@ class Camera {
      * @param {number} angle - Angle in radians
      */
     rotateRight(angle) {
-        this.rotateLeft(-angle);
+        this.rotateLeft(-angle); // This will now use the correct direction
     }
     
     /**
