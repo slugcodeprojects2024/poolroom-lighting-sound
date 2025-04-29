@@ -103,3 +103,60 @@ const fragmentShaderSource = `
         gl_FragColor = color;
     }
 `;
+
+/**
+ * Compile vertex and fragment shaders and link them into a program
+ * @param {string} vsSource - Vertex shader source code
+ * @param {string} fsSource - Fragment shader source code
+ * @returns {boolean} - Whether compilation and linking succeeded
+ */
+compile(vsSource, fsSource) {
+    const gl = this.gl;
+    
+    // Create and compile vertex shader
+    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vertexShader, vsSource);
+    gl.compileShader(vertexShader);
+    
+    // Check for vertex shader compile errors
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+        console.error('Vertex shader compilation failed:', gl.getShaderInfoLog(vertexShader));
+        gl.deleteShader(vertexShader);
+        return false;
+    }
+    
+    // Create and compile fragment shader
+    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fragmentShader, fsSource);
+    gl.compileShader(fragmentShader);
+    
+    // Check for fragment shader compile errors
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+        console.error('Fragment shader compilation failed:', gl.getShaderInfoLog(fragmentShader));
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+        return false;
+    }
+    
+    // Create shader program
+    this.program = gl.createProgram();
+    gl.attachShader(this.program, vertexShader);
+    gl.attachShader(this.program, fragmentShader);
+    gl.linkProgram(this.program);
+    
+    // Check for linking errors
+    if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
+        console.error('Shader program linking failed:', gl.getProgramInfoLog(this.program));
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+        gl.deleteProgram(this.program);
+        this.program = null;
+        return false;
+    }
+    
+    // Clean up shaders (they're linked to the program now)
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+    
+    return true;
+}
