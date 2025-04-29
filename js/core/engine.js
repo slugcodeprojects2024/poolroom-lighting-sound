@@ -228,6 +228,29 @@ class Engine {
         this.shader.setMatrix4('u_viewMatrix', this.camera.viewMatrix);
         this.shader.setMatrix4('u_projectionMatrix', this.camera.projectionMatrix);
         
+        // TESTING: Draw a cube in front of the camera to verify rendering works
+        const testModelMatrix = createTransformationMatrix();
+        const cameraFront = this.camera.front;
+        const testPosition = [
+            this.camera.position[0] + cameraFront[0] * 3,  // 3 units in front of camera
+            this.camera.position[1] + cameraFront[1] * 3,
+            this.camera.position[2] + cameraFront[2] * 3
+        ];
+        const testTranslation = createTranslationMatrix(testPosition[0], testPosition[1], testPosition[2]);
+        const testRotation = createRotationYMatrix(performance.now() * 0.001);  // Slowly rotating
+        const testScale = createScaleMatrix(0.5, 0.5, 0.5);  // Smaller cube
+        
+        // Combine transformations
+        const temp = multiplyMatrices(testTranslation, testRotation);
+        const finalTestMatrix = multiplyMatrices(temp, testScale);
+        
+        // Set model matrix
+        this.shader.setMatrix4('u_modelMatrix', finalTestMatrix);
+        
+        // Draw test cube
+        this.cube.draw(this.shader);
+        
+        // Continue with regular rendering
         // Current time for animations
         const currentTime = performance.now() * 0.001; // Convert to seconds
         
