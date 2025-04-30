@@ -1,263 +1,167 @@
 class World {
-    constructor(gl) {
+    /**
+     * Manages the game world, including blocks and textures.
+     * @param {WebGLRenderingContext} gl - The WebGL context.
+     * @param {Cube} cubeGeometry - Shared cube geometry instance.
+     * @param {Shader} shader - Shared shader program instance.
+     */
+    constructor(gl, cubeGeometry, shader) {
         this.gl = gl;
-        this.blocks = {};
-        this.worldData = [];
-        this.blockSize = 1.0; // Size of each block
-        this.width = 32;     // Width of the world (X axis)
-        this.depth = 32;     // Depth of the world (Z axis)
-        this.height = 16;    // Maximum height of the world (Y axis)
-        this.waterLevel = 2; // Default water level height
-        
-        // Initialize block types
-        this.initBlocks();
+        this.cubeGeometry = cubeGeometry;
+        this.shader = shader;
+        this.blocks = []; // Array to hold all Block instances
+        this.textures = {}; // Object to store loaded textures by type
+        this.map = []; // 2D array representing the world layout
     }
-    
+
     /**
-     * Initialize different block types
+     * Loads textures required for the world blocks.
+     * Call this before generateWorld.
+     * Example texture paths: 'assets/textures/wall.png', 'assets/textures/floor.png'
      */
-    initBlocks() {
-        this.blocks.default = new Block(this.gl, 'default');
-        this.blocks.water = new Block(this.gl, 'water');
-        this.blocks.tile = new Block(this.gl, 'tile');
-        this.blocks.wall = new Block(this.gl, 'wall');
+    loadTextures() {
+        // Example: Load textures for different block types
+        // Add more as needed based on your map values
+        this.textures['wall'] = this.loadTexture('assets/textures/wall.png'); // Replace with your actual wall texture
+        this.textures['floor'] = this.loadTexture('assets/textures/floor.png'); // Replace with your actual floor texture
+        // Add textures for other block types (e.g., ceiling, different walls)
+        // this.textures['ceiling'] = this.loadTexture('assets/textures/ceiling.png');
+        // this.textures['debug'] = this.loadTexture('assets/textures/debug.png');
+        console.log("Textures loading initiated.");
     }
-    
+
     /**
-     * Generate the world from a 2D height map
-     * @param {Array<Array<number>>} heightMap - 2D array of height values
-     * @param {number} waterLevel - Water level height
+     * Generates the world blocks based on a 2D map array.
+     * @param {number[][]} mapData - A 2D array where numbers represent block types.
+     *                                 Example: 0 = empty, 1 = wall, 2 = floor
      */
-    generateFromHeightMap(heightMap, waterLevel = 2) {
-        this.worldData = [];
-        this.waterLevel = waterLevel;
-        
-        // Process the height map
-        for (let z = 0; z < this.depth; z++) {
-            for (let x = 0; x < this.width; x++) {
-                // Get block height from map (or default to 0)
-                const blockHeight = heightMap && heightMap[z] && heightMap[z][x] !== undefined 
-                    ? heightMap[z][x] 
-                    : 0;
-                
-                if (blockHeight > 0) {
-                    // Add solid blocks up to the height
-                    for (let y = 0; y < blockHeight; y++) {
-                        // Use tile for the top, wall for sides
-                        const blockType = y === blockHeight - 1 ? 'tile' : 'wall';
-                        
-                        this.worldData.push({
-                            x: x,
-                            y: y,
-                            z: z,
-                            type: blockType
-                        });
-                    }
-                }
-                
-                // Add water blocks up to water level if block height is below water level
-                if (blockHeight < waterLevel) {
-                    for (let y = blockHeight; y < waterLevel; y++) {
-                        this.worldData.push({
-                            x: x,
-                            y: y,
-                            z: z,
-                            type: 'water'
-                        });
-                    }
-                }
-                
-                // Add ground plane at y=0 if no block
-                if (blockHeight <= 0) {
-                    this.worldData.push({
-                        x: x,
-                        y: 0,
-                        z: z,
-                        type: 'tile'
-                    });
-                }
-            }
+    generateWorld(mapData) {
+        this.map = mapData;
+        this.blocks = []; // Clear existing blocks
+
+        if (!this.textures['wall'] || !this.textures['floor']) {
+             console.warn("Textures not loaded before generating world. Using placeholders if available.");
+             // Optionally load default/debug textures here if needed
+             if (!this.textures['wall']) this.textures['wall'] = this.loadTexture('assets/textures/debug.png');
+             if (!this.textures['floor']) this.textures['floor'] = this.loadTexture('assets/textures/debug.png');
         }
-        
-        console.log(`World generated with ${this.worldData.length} blocks`);
-    }
-    
-    /**
-     * Generate a simple test world for the poolroom
-     */
-    generateTestWorld() {
-        // Create a height map for testing (initialized with zeros)
-        const heightMap = Array(this.depth).fill().map(() => Array(this.width).fill(0));
-        
-        // Create a border around the world
-        for (let x = 0; x < this.width; x++) {
-            for (let z = 0; z < this.depth; z++) {
-                // Border walls
-                if (x === 0 || x === this.width - 1 || z === 0 || z === this.depth - 1) {
-                    heightMap[z][x] = 8; // 8 blocks high
+
+
+        const rows = mapData.length;
+        const cols = mapData[0].length;
+
+        for (let z = 0; z < rows; z++) {
+            for (let x = 0; x < cols; x++) {
+                const blockType = mapData[z][x];
+                const position = [x, 0, z]; // Place blocks on the XZ plane at y=0 initially
+
+                let texture = null;
+                let typeString = 'empty';
+
+                switch (blockType) {
+                    case 0: // Empty space - do nothing, or maybe add air blocks later
+                        continue; // Skip creating a block for empty space
+                    case 1: // Wall block
+                        texture = this.textures['wall'];
+                        typeString = 'wall';
+                        // Create wall blocks (potentially with height)
+                        // For now, just one block at y=0
+                        this.blocks.push(new Block(position, typeString, texture));
+                        // Example: Add blocks above for wall height
+                        // this.blocks.push(new Block([x, 1, z], typeString, texture));
+                        // this.blocks.push(new Block([x, 2, z], typeString, texture));
+                        break;
+                    case 2: // Floor block
+                        texture = this.textures['floor'];
+                        typeString = 'floor';
+                        this.blocks.push(new Block(position, typeString, texture));
+                        break;
+                    // Add more cases for different block types (e.g., ceiling, different walls)
+                    default:
+                        console.warn(`Unknown block type ${blockType} at [${x}, ${z}]`);
+                        // Optionally use a default/debug texture
+                        // texture = this.textures['debug'];
+                        // if (texture) {
+                        //     this.blocks.push(new Block(position, 'unknown', texture));
+                        // }
+                        break;
                 }
             }
         }
-        
-        // Create some columns
-        for (let z = 5; z < this.depth - 5; z += 7) {
-            for (let x = 5; x < this.width - 5; x += 7) {
-                heightMap[z][x] = 8; // Column height
-            }
-        }
-        
-        // Create an elevated platform
-        for (let z = 14; z < 24; z++) {
-            for (let x = 12; x < 22; x++) {
-                heightMap[z][x] = 3; // Platform height
-            }
-        }
-        
-        // Create a second elevated platform
-        for (let z = 8; z < 12; z++) {
-            for (let x = 22; x < 28; x++) {
-                heightMap[z][x] = 5; // Platform height
-            }
-        }
-        
-        // Create stairs to the elevated platform
-        for (let i = 0; i < 3; i++) {
-            for (let x = 14 + i; x < 20 - i; x++) {
-                heightMap[13 - i][x] = i + 1;
-            }
-        }
-        
-        // Set water level
-        const waterLevel = 2;
-        
-        // Generate world from this height map
-        this.generateFromHeightMap(heightMap, waterLevel);
+        console.log(`World generated with ${this.blocks.length} blocks.`);
     }
-    
+
     /**
-     * Check if there's a block at the specified position
-     * @param {number} x - X position in world coordinates
-     * @param {number} y - Y position in world coordinates
-     * @param {number} z - Z position in world coordinates
-     * @returns {Object|null} - Block data if found, null otherwise
+     * Renders all the blocks in the world.
+     * Assumes the shader program is already in use and camera matrices are set.
      */
-    getBlockAt(x, y, z) {
-        // Convert world coordinates to grid coordinates
-        const gridX = Math.floor(x / this.blockSize);
-        const gridY = Math.floor(y / this.blockSize);
-        const gridZ = Math.floor(z / this.blockSize);
-        
-        // Check bounds
-        if (gridX < 0 || gridX >= this.width || 
-            gridY < 0 || gridY >= this.height || 
-            gridZ < 0 || gridZ >= this.depth) {
-            return null;
+    render() {
+        // The shader should already be bound by the Engine before calling this
+        // Camera uniforms should also be set by the Engine
+
+        for (const block of this.blocks) {
+            block.render(this.shader, this.cubeGeometry, this.gl);
         }
-        
-        // Find the block at this position
-        for (const block of this.worldData) {
-            if (block.x === gridX && block.y === gridY && block.z === gridZ) {
-                return block;
-            }
-        }
-        
-        return null;
     }
-    
-    /**
-     * Check if player collides with any solid blocks
-     * @param {Array<number>} position - Player position [x, y, z]
-     * @param {number} radius - Player collision radius
-     * @returns {boolean} - Whether there's a collision
-     */
-    checkCollision(position, radius = 0.3) {
-        // Check surrounding blocks
-        const px = position[0];
-        const py = position[1];
-        const pz = position[2];
-        
-        // Check for head collision (height = 1.7 blocks)
-        const headY = py + 1.7;
-        
-        // Check for foot collision
-        const footY = py;
-        
-        // Check points around the player
-        for (let offsetY = 0; offsetY <= 1; offsetY++) {
-            const y = footY + offsetY;
-            
-            for (let offsetX = -1; offsetX <= 1; offsetX++) {
-                for (let offsetZ = -1; offsetZ <= 1; offsetZ++) {
-                    if (offsetX === 0 && offsetZ === 0) {
-                        // Check center point only for head and feet
-                        const block = this.getBlockAt(px, y, pz);
-                        if (block && block.type !== 'water') {
-                            return true; // Collision detected
-                        }
-                    } else {
-                        // Check perimeter points at player radius
-                        const checkX = px + offsetX * radius;
-                        const checkZ = pz + offsetZ * radius;
-                        
-                        const block = this.getBlockAt(checkX, y, checkZ);
-                        if (block && block.type !== 'water') {
-                            return true; // Collision detected
-                        }
-                    }
-                }
+
+    // --- Helper: Texture Loading (Copied from Engine for encapsulation) ---
+    // You could also pass the engine's loadTexture function to the World constructor
+    loadTexture(url) {
+        const gl = this.gl;
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+
+        const level = 0;
+        const internalFormat = gl.RGBA;
+        const width = 1;
+        const height = 1;
+        const border = 0;
+        const srcFormat = gl.RGBA;
+        const srcType = gl.UNSIGNED_BYTE;
+        const pixel = new Uint8Array([0, 0, 255, 255]); // opaque blue placeholder
+        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
+
+        const image = new Image();
+        image.onload = () => {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
+
+            if (this.isPowerOf2(image.width) && this.isPowerOf2(image.height)) {
+               gl.generateMipmap(gl.TEXTURE_2D);
+            } else {
+               gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+               gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+               gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             }
-        }
-        
-        // No collision
-        return false;
+            console.log(`Texture loaded for world: ${url}`);
+        };
+        image.onerror = () => {
+            console.error(`Failed to load world texture: ${url}`);
+        };
+        image.src = url;
+
+        return texture;
     }
-    
-    /**
-     * Check if player is in water
-     * @param {Array<number>} position - Player position [x, y, z]
-     * @returns {boolean} - Whether player is in water
-     */
-    isInWater(position) {
-        const block = this.getBlockAt(position[0], position[1], position[2]);
-        return block && block.type === 'water';
+
+    isPowerOf2(value) {
+        return (value & (value - 1)) === 0;
     }
-    
+
     /**
-     * Draw the world
-     * @param {Shader} shader - Shader program to use
-     * @param {number} time - Current time for animations
+     * Gets the block type at a specific world coordinate.
+     * Note: This currently only checks the base layer (y=0).
+     * Needs refinement for multi-layer worlds or different coordinate systems.
+     * @param {number} x - World X coordinate
+     * @param {number} z - World Z coordinate
+     * @returns {number} - The block type from the map (e.g., 0, 1, 2), or -1 if out of bounds.
      */
-    draw(shader, time) {
-        // Set time uniform for water animation
-        const timeLocation = shader.getUniformLocation('u_time');
-        if (timeLocation !== null) {
-            this.gl.uniform1f(timeLocation, time);
+    getBlockType(x, z) {
+        const mapX = Math.floor(x);
+        const mapZ = Math.floor(z);
+
+        if (mapZ >= 0 && mapZ < this.map.length && mapX >= 0 && mapX < this.map[0].length) {
+            return this.map[mapZ][mapX];
         }
-        
-        // Draw each block (non-water blocks first, then water)
-        
-        // First pass: draw solid blocks
-        for (const block of this.worldData) {
-            if (block.type !== 'water') {
-                this.blocks[block.type].draw(
-                    shader, 
-                    block.x * this.blockSize, 
-                    block.y * this.blockSize, 
-                    block.z * this.blockSize
-                );
-            }
-        }
-        
-        // Second pass: draw water blocks
-        for (const block of this.worldData) {
-            if (block.type === 'water') {
-                this.blocks[block.type].draw(
-                    shader, 
-                    block.x * this.blockSize, 
-                    block.y * this.blockSize, 
-                    block.z * this.blockSize
-                );
-            }
-        }
+        return -1; // Out of bounds
     }
 }

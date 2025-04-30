@@ -2,7 +2,8 @@ class Cube {
     constructor(gl) {
         this.gl = gl;
         this.vertexBuffer = null;
-        this.colorBuffer = null;
+        this.colorBuffer = null; // Keep for now, might remove if using only textures
+        this.texCoordBuffer = null; // Added for texture coordinates
         this.indexBuffer = null;
         this.numIndices = 0;
         
@@ -94,6 +95,23 @@ class Cube {
             0.0, 0.5, 1.0, 1.0
         ]);
         
+        // Define texture coordinates (UVs) for each vertex
+        // Match the vertex order
+        const texCoords = new Float32Array([
+            // Front face
+            0.0, 0.0,   1.0, 0.0,   1.0, 1.0,   0.0, 1.0,
+            // Back face
+            1.0, 0.0,   1.0, 1.0,   0.0, 1.0,   0.0, 0.0,
+            // Top face
+            0.0, 1.0,   0.0, 0.0,   1.0, 0.0,   1.0, 1.0,
+            // Bottom face
+            1.0, 1.0,   0.0, 1.0,   0.0, 0.0,   1.0, 0.0,
+            // Right face
+            1.0, 0.0,   1.0, 1.0,   0.0, 1.0,   0.0, 0.0,
+            // Left face
+            0.0, 0.0,   1.0, 0.0,   1.0, 1.0,   0.0, 1.0,
+        ]);
+        
         // Define indices for triangles
         const indices = new Uint16Array([
             0,  1,  2,    0,  2,  3,  // Front face
@@ -114,6 +132,11 @@ class Cube {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
         
+        // Create and bind texture coordinate buffer
+        this.texCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
+        
         // Create and bind index buffer
         this.indexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
@@ -132,18 +155,32 @@ class Cube {
         // Get attribute locations
         const positionAttrib = shader.getAttribLocation('a_position');
         const colorAttrib = shader.getAttribLocation('a_color');
+        const texCoordAttrib = shader.getAttribLocation('a_texCoord'); // Added
         
         // Enable attributes
         gl.enableVertexAttribArray(positionAttrib);
-        gl.enableVertexAttribArray(colorAttrib);
+        if (colorAttrib !== -1) { // Check if attribute exists
+             gl.enableVertexAttribArray(colorAttrib);
+        }
+        if (texCoordAttrib !== -1) { // Check if attribute exists
+            gl.enableVertexAttribArray(texCoordAttrib);
+        }
         
         // Bind vertex buffer and set attribute pointers
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         gl.vertexAttribPointer(positionAttrib, 3, gl.FLOAT, false, 0, 0);
         
-        // Bind color buffer and set attribute pointers
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
-        gl.vertexAttribPointer(colorAttrib, 4, gl.FLOAT, false, 0, 0);
+        // Bind color buffer and set attribute pointers (optional, if still using color)
+        if (colorAttrib !== -1) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
+            gl.vertexAttribPointer(colorAttrib, 4, gl.FLOAT, false, 0, 0);
+        }
+        
+        // Bind texture coordinate buffer and set attribute pointers
+        if (texCoordAttrib !== -1) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
+            gl.vertexAttribPointer(texCoordAttrib, 2, gl.FLOAT, false, 0, 0); // 2 components (u, v)
+        }
         
         // Bind index buffer
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
@@ -153,7 +190,12 @@ class Cube {
         
         // Clean up
         gl.disableVertexAttribArray(positionAttrib);
-        gl.disableVertexAttribArray(colorAttrib);
+        if (colorAttrib !== -1) {
+            gl.disableVertexAttribArray(colorAttrib);
+        }
+        if (texCoordAttrib !== -1) {
+            gl.disableVertexAttribArray(texCoordAttrib);
+        }
     }
 }
 

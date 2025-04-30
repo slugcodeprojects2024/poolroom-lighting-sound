@@ -119,6 +119,27 @@ class Shader {
         const location = this.uniforms[name] || this.gl.getUniformLocation(this.program, name);
         this.gl.uniform3fv(location, value);
     }
+
+    /**
+     * Set a boolean uniform
+     * @param {string} name - Uniform name
+     * @param {boolean} value - Boolean value
+     */
+    setBool(name, value) {
+        const location = this.uniforms[name] || this.gl.getUniformLocation(this.program, name);
+        // WebGL doesn't have a direct boolean uniform function, use integer (1 for true, 0 for false)
+        this.gl.uniform1i(location, value ? 1 : 0);
+    }
+
+    /**
+     * Set an integer uniform (used for texture samplers)
+     * @param {string} name - Uniform name
+     * @param {number} value - Integer value (texture unit index)
+     */
+    setInt(name, value) {
+        const location = this.uniforms[name] || this.gl.getUniformLocation(this.program, name);
+        this.gl.uniform1i(location, value);
+    }
     
     /**
      * Get attribute location
