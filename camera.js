@@ -12,7 +12,7 @@ class Camera {
         this.projectionMatrix = new Matrix4();
         
         // Camera parameters
-        this.speed = 0.08; // Slower speed makes space feel larger
+        this.speed = 1.0; // Slower speed makes space feel larger
         this.sensitivity = 0.15;
         this.yaw = -90.0; // Default looking forward
         this.pitch = 0.0;
@@ -111,10 +111,10 @@ class Camera {
     // Process keyboard rotation (Q/E keys)
     processKeyboardRotation(direction) {
         if (direction === 'LEFT') {
-            this.yaw -= 2.0;
+            this.yaw += 2.0; // Q key pans left
         }
         if (direction === 'RIGHT') {
-            this.yaw += 2.0;
+            this.yaw -= 2.0; // E key pans right
         }
         
         // Update camera vectors with new orientation
