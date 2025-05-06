@@ -1,186 +1,203 @@
 // main.js - Main application entry point
-
-// Global variables
 let gl;
-let canvas;
-let camera;
-let world;
 let program;
-let textures = {};
+let camera;
+let poolRoom;
+let lastTime = 0;
 let keys = {};
+let mouseX = 0, mouseY = 0;
+let mouseDown = false;
 
-// Initialize WebGL
-function main() {
-    // Get canvas element
-    canvas = document.getElementById('webgl');
+// Initialize WebGL context
+function init() {
+    // Get the canvas element
+    const canvas = document.getElementById('webgl');
     
-    // Get WebGL context
-    gl = getWebGLContext(canvas);
+    // Get the WebGL context
+    gl = canvas.getContext('webgl');
     if (!gl) {
-        console.error('Failed to get WebGL context');
+        console.error('WebGL not supported by your browser!');
         return;
     }
     
-    // Initialize shaders
-    const vertexShaderSource = document.getElementById('vertex-shader').textContent;
-    const fragmentShaderSource = document.getElementById('fragment-shader').textContent;
-    program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
-    if (!program) {
-        console.error('Failed to initialize shaders');
-        return;
-    }
+    // Adjust canvas to full window size
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    gl.viewport(0, 0, canvas.width, canvas.height);
     
-    gl.useProgram(program);
-    gl.program = program;
-    
-    // Enable depth test
+    // Enable depth testing for 3D rendering
     gl.enable(gl.DEPTH_TEST);
     
-    // Initialize camera
-    camera = new Camera(canvas);
+    // Initialize shaders
+    initShaders();
     
-    // Create textures programmatically
-    createTextures();
+    // Create camera
+    camera = new Camera(gl);
     
-    // Initialize event listeners
-    initEventListeners();
+    // Create the poolroom
+    poolRoom = new PoolRoom(gl);
+    
+    // Set up event listeners
+    setupEventListeners(canvas);
     
     // Start the render loop
-    requestAnimationFrame(render);
+    lastTime = performance.now();
+    render();
 }
 
-// Create textures programmatically
-function createTextures() {
-    // Create wall texture (brown)
-    textures.wall = createColorTexture(gl, 150, 100, 50);
+// Initialize shaders
+function initShaders() {
+    // Get shader source from HTML script tags
+    const vertexShaderSource = document.getElementById('vertex-shader').text;
+    const fragmentShaderSource = document.getElementById('fragment-shader').text;
     
-    // Create ground texture (green)
-    textures.ground = createColorTexture(gl, 50, 150, 50);
+    // Create shader program
+    program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
     
-    // Create sky texture (blue)
-    textures.sky = createColorTexture(gl, 100, 150, 255);
-    
-    // Initialize the world
-    world = new World(gl);
-
-    // Create collision handler
-    // Ensure CollisionHandler class is defined (collision.js must be loaded)
-    const collisionHandler = new CollisionHandler(world.poolRoom);
-    camera.setCollisionHandler(collisionHandler);
-    
-    // Position camera in the main pool room
-    const mainPoolX = world.poolRoom.rooms.find(r => r.id === 'main_pool')?.x || 0;
-    const mainPoolZ = world.poolRoom.rooms.find(r => r.id === 'main_pool')?.z || 0;
-    const mainPoolWidth = world.poolRoom.rooms.find(r => r.id === 'main_pool')?.width || 20;
-    const mainPoolLength = world.poolRoom.rooms.find(r => r.id === 'main_pool')?.length || 30;
-
-    // Position camera in the center of the main pool room, just above floor level
-    camera.eye = new Vector3([
-        mainPoolX + mainPoolWidth/2, 
-        1.5, 
-        mainPoolZ + mainPoolLength/2
-    ]);
-    camera.at = new Vector3([
-        mainPoolX + mainPoolWidth/2, 
-        1.5, 
-        mainPoolZ + mainPoolLength/2 - 5
-    ]); // Looking toward the front of the pool
-    camera.updateViewMatrix();
+    // Use the program
+    gl.useProgram(program);
 }
 
-// Create a solid color texture
-function createColorTexture(gl, r, g, b) {
-    const texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    
-    // Create a 2x2 pixel texture with the specified color
-    const pixels = new Uint8Array([
-        r, g, b, 255,   r, g, b, 255,
-        r, g, b, 255,   r, g, b, 255
-    ]);
-    
-    // Upload the texture data
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    
-    // Set texture parameters
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    
-    return texture;
-}
-
-// Initialize event listeners
-function initEventListeners() {
-    // Keyboard event listeners
+// Handle keyboard and mouse events
+function setupEventListeners(canvas) {
+    // Keyboard events
     document.addEventListener('keydown', function(event) {
-        keys[event.key.toLowerCase()] = true;
+        keys[event.key] = true;
     });
     
     document.addEventListener('keyup', function(event) {
-        keys[event.key.toLowerCase()] = false;
+        keys[event.key] = false;
     });
     
-    // Handle window resize
-    window.addEventListener('resize', function() {
-        if (camera) {
-            camera.updateProjectionMatrix(canvas);
+    // Mouse movement events
+    document.addEventListener('mousemove', function(event) {
+        if (mouseDown) {
+            const xOffset = event.clientX - mouseX;
+            const yOffset = event.clientY - mouseY;
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+            
+            camera.processMouseMovement(xOffset, yOffset);
         }
     });
     
-    // Assuming 'canvas' is your HTML canvas element
-    // Assuming 'camera' is your Camera instance
+    // Mouse button events
+    canvas.addEventListener('mousedown', function(event) {
+        mouseDown = true;
+        mouseX = event.clientX;
+        mouseY = event.clientY;
+        
+        // Request pointer lock for mouse control
+        canvas.requestPointerLock = canvas.requestPointerLock ||
+                                    canvas.mozRequestPointerLock;
+        canvas.requestPointerLock();
+    });
     
-    canvas.addEventListener('mousedown', (ev) => camera.handleMouseDown(ev));
-    canvas.addEventListener('mousemove', (ev) => camera.handleMouseMove(ev));
-    canvas.addEventListener('mouseup', (ev) => camera.handleMouseUp(ev));
-    canvas.addEventListener('mouseleave', (ev) => camera.handleMouseUp(ev)); // Optional: stops dragging if mouse leaves canvas
+    document.addEventListener('mouseup', function() {
+        mouseDown = false;
+        
+        // Exit pointer lock
+        document.exitPointerLock = document.exitPointerLock ||
+                                   document.mozExitPointerLock;
+        document.exitPointerLock();
+    });
+    
+    // Pointer lock change event
+    document.addEventListener('pointerlockchange', lockChangeAlert, false);
+    document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
+    
+    function lockChangeAlert() {
+        if (document.pointerLockElement === canvas ||
+            document.mozPointerLockElement === canvas) {
+            // Pointer locked - enable mouse movement tracking
+            document.addEventListener('mousemove', updatePosition, false);
+        } else {
+            // Pointer unlocked - disable mouse movement tracking
+            document.removeEventListener('mousemove', updatePosition, false);
+        }
+    }
+    
+    function updatePosition(e) {
+        // Handle mouse movement with pointer lock
+        const xOffset = e.movementX || e.mozMovementX || 0;
+        const yOffset = e.movementY || e.mozMovementY || 0;
+        
+        camera.processMouseMovement(xOffset, yOffset);
+    }
+    
+    // Mouse click for block manipulation
+    canvas.addEventListener('click', function(event) {
+        // Add block with left click
+        if (event.button === 0) {
+            const pos = camera.getFrontGridPosition();
+            poolRoom.addBlock(pos.x, pos.y, pos.z);
+        }
+    });
+    
+    canvas.addEventListener('contextmenu', function(event) {
+        // Remove block with right click
+        event.preventDefault();
+        const pos = camera.getFrontGridPosition();
+        poolRoom.removeBlock(pos.x, pos.y, pos.z);
+    });
+    
+    // Window resize event
+    window.addEventListener('resize', function() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        
+        // Update projection matrix for new aspect ratio
+        const aspect = canvas.width / canvas.height;
+        camera.projectionMatrix.setPerspective(camera.fov, aspect, 0.05, 1000.0);
+    });
 }
 
-// Handle keyboard input
-function handleKeyboardInput() {
-    // Existing movement controls
-    if (keys['w']) camera.moveForward();
-    if (keys['s']) camera.moveBackwards();
-    if (keys['a']) camera.moveLeft();
-    if (keys['d']) camera.moveRight();
-    if (keys['q']) camera.panLeft();
-    if (keys['e']) camera.panRight();
+// Process keyboard input
+function processInput(deltaTime) {
+    // WASD keys for movement
+    if (keys['w'] || keys['W']) {
+        camera.processKeyboard('FORWARD', deltaTime);
+    }
+    if (keys['s'] || keys['S']) {
+        camera.processKeyboard('BACKWARD', deltaTime);
+    }
+    if (keys['a'] || keys['A']) {
+        camera.processKeyboard('LEFT', deltaTime);
+    }
+    if (keys['d'] || keys['D']) {
+        camera.processKeyboard('RIGHT', deltaTime);
+    }
     
-    // Add vertical movement for free camera
-    if (keys['r']) camera.moveUp();
-    if (keys['f']) camera.moveDown();
-    
-    // Toggle collision detection with C key (one-time press)
-    if (keys['c']) {
-        // Assuming collisionHandler is accessible in this scope
-        // You might need to ensure collisionHandler is defined globally or passed appropriately
-        if (typeof collisionHandler !== 'undefined' && collisionHandler) {
-            collisionHandler.toggleCollision();
-        }
-        keys['c'] = false; // Prevent repeated activation
+    // QE keys for camera rotation
+    if (keys['q'] || keys['Q']) {
+        camera.processKeyboardRotation('LEFT');
+    }
+    if (keys['e'] || keys['E']) {
+        camera.processKeyboardRotation('RIGHT');
     }
 }
 
-// Render function
+// Main render loop
 function render() {
-    // Handle keyboard input
-    handleKeyboardInput();
+    // Calculate delta time
+    const currentTime = performance.now();
+    const deltaTime = (currentTime - lastTime) / 1000.0; // Convert to seconds
+    lastTime = currentTime;
+    
+    // Process keyboard input
+    processInput(deltaTime);
     
     // Clear the canvas
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clearColor(0.1, 0.1, 0.1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
-    // Only render if world is initialized
-    if (world) {
-        // Render the world
-        world.render(gl, program, camera.viewMatrix, camera.projectionMatrix);
-    }
+    // Render the poolroom
+    poolRoom.render(gl, program, camera);
     
-    // Request the next frame
+    // Request next frame
     requestAnimationFrame(render);
 }
 
-// Start the application when the page has loaded
-window.onload = main;
+// Start the application when the page loads
+window.onload = init;
