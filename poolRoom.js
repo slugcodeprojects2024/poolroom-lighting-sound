@@ -57,44 +57,49 @@ class PoolRoom {
             }
         }
         
-        // Add columns in the room
-        for (let x = 4; x < this.mapSize - 4; x += 6) {
-            for (let z = 4; z < this.mapSize - 4; z += 6) {
-                this.map[x][z] = this.maxHeight; // Full height columns
+        // Create window patterns - based on your first image
+        // Tall vertical windows on the left side
+        for (let z = 6; z < this.mapSize - 6; z += 8) {
+            for (let y = 0; y < this.maxHeight - 1; y++) {
+                // Create tall window openings
+                this.map[0][z] = 0; // Complete opening in wall
+                this.map[0][z+1] = 0; // Make window 2 units wide
             }
         }
         
-        // Create window patterns in the outer walls
-        for (let x = 4; x < this.mapSize - 4; x += 3) {
-            // Windows on north and south walls
-            this.map[x][0] = 0; // Window (no wall)
-            this.map[x][1] = 1; // Window ledge
+        // Windows on other walls
+        for (let x = 8; x < this.mapSize - 8; x += 8) {
+            this.map[x][0] = 0;
+            this.map[x+1][0] = 0;
             
-            this.map[x][this.mapSize-1] = 0; // Window (no wall)
-            this.map[x][this.mapSize-2] = 1; // Window ledge
+            this.map[x][this.mapSize-1] = 0;
+            this.map[x+1][this.mapSize-1] = 0;
+            
+            this.map[this.mapSize-1][x] = 0;
+            this.map[this.mapSize-1][x+1] = 0;
         }
         
-        for (let z = 4; z < this.mapSize - 4; z += 3) {
-            // Windows on east and west walls
-            this.map[0][z] = 0; // Window (no wall)
-            this.map[1][z] = 1; // Window ledge
-            
-            this.map[this.mapSize-1][z] = 0; // Window (no wall)
-            this.map[this.mapSize-2][z] = 1; // Window ledge
+        // Large central pool
+        // Based on your first image, the pool is a large, somewhat irregular shape
+        for (let x = 4; x < this.mapSize - 4; x++) {
+            for (let z = this.mapSize/2; z < this.mapSize - 4; z++) {
+                // Create walkway around the edge of the pool
+                if (x > 6 && x < this.mapSize - 6 && z > this.mapSize/2 + 2) {
+                    // This area will be the pool - don't put walls here
+                    // We'll render the water separately
+                } else {
+                    // Floor level walls/walkways
+                    if (this.map[x][z] === 0) this.map[x][z] = 1;
+                }
+            }
         }
         
-        // Create entrances/exits
-        this.map[this.mapSize/2][0] = 0; // North entrance
-        this.map[this.mapSize/2][1] = 0;
-        
-        this.map[this.mapSize/2][this.mapSize-1] = 0; // South entrance
-        this.map[this.mapSize/2][this.mapSize-2] = 0;
-        
-        this.map[0][this.mapSize/2] = 0; // West entrance
-        this.map[1][this.mapSize/2] = 0;
-        
-        this.map[this.mapSize-1][this.mapSize/2] = 0; // East entrance
-        this.map[this.mapSize-2][this.mapSize/2] = 0;
+        // Add some structural columns/pillars
+        for (let x = 8; x < this.mapSize - 8; x += 8) {
+            for (let z = 8; z < this.mapSize - 8; z += 8) {
+                this.map[x][z] = this.maxHeight;
+            }
+        }
     }
     
     // Create textures programmatically
@@ -137,7 +142,7 @@ class PoolRoom {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
         
-        // 3. Load sky texture from file
+        // Sky texture loading - use your existing skybox_render.jpg
         this.textures.sky = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, this.textures.sky);
         
@@ -151,11 +156,20 @@ class PoolRoom {
         const skyImage = new Image();
         skyImage.onload = () => {
             gl.bindTexture(gl.TEXTURE_2D, this.textures.sky);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // Flip the image vertically
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, skyImage);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); // Reset to default
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            console.log("Sky texture loaded successfully");
         };
-        skyImage.src = 'textures/sky.png';
+        skyImage.onerror = () => {
+            console.error("Failed to load sky texture");
+        };
+        // Make sure the path is correct
+        skyImage.src = 'textures/skybox_render.jpg';
     }
     
     // Build the 3D world based on the map
@@ -191,33 +205,43 @@ class PoolRoom {
         const viewMatrix = camera.viewMatrix;
         const projectionMatrix = camera.projectionMatrix;
         
-        // Set baseColor uniform for blue water
+        // Set baseColor uniform for objects
         const u_baseColor = gl.getUniformLocation(program, 'u_baseColor');
+        const u_texColorWeight = gl.getUniformLocation(program, 'u_texColorWeight');
+        const u_Sampler = gl.getUniformLocation(program, 'u_Sampler');
         
         // 1. Render skybox with sky texture
         gl.depthFunc(gl.LEQUAL);
         gl.bindTexture(gl.TEXTURE_2D, this.textures.sky);
-        gl.uniform4f(u_baseColor, 0.7, 0.85, 1.0, 1.0); // Light blue
-        this.skybox.render(gl, program, viewMatrix, projectionMatrix, 1.0); // Full texture
+        gl.uniform1i(u_Sampler, 0);
+        gl.uniform4f(u_baseColor, 0.8, 0.9, 1.0, 1.0); // Sky color
+        gl.uniform1f(u_texColorWeight, 1.0); // Full texture
+        this.skybox.render(gl, program, viewMatrix, projectionMatrix, 1.0);
         gl.depthFunc(gl.LESS);
         
         // 2. Render ground with floor texture
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.floor);
+        gl.bindTexture(gl.TEXTURE_2D, this.textures.floor || this.textures.wall); // Fallback to wall if floor texture not created yet
+        gl.uniform1i(u_Sampler, 0);
         gl.uniform4f(u_baseColor, 0.95, 0.95, 0.95, 1.0); // Off-white
-        this.ground.render(gl, program, viewMatrix, projectionMatrix, 1.0);
+        gl.uniform1f(u_texColorWeight, 0.3); // Subtle texture
+        this.ground.render(gl, program, viewMatrix, projectionMatrix, 0.3);
         
         // 3. Render pool water (with transparency)
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.uniform4f(u_baseColor, 0.0, 0.7, 0.95, 0.8); // Bright blue, semi-transparent
-        this.poolWater.render(gl, program, viewMatrix, projectionMatrix, 0.0); // No texture, just color
+        gl.uniform1f(u_texColorWeight, 0.0); // No texture, just color
+        this.poolWater.render(gl, program, viewMatrix, projectionMatrix, 0.0);
         gl.disable(gl.BLEND);
         
         // 4. Render all walls and ceiling cubes
         gl.bindTexture(gl.TEXTURE_2D, this.textures.wall);
+        gl.uniform1i(u_Sampler, 0);
         gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0); // Pure white
+        gl.uniform1f(u_texColorWeight, 0.2); // Subtle texture
+        
         for (const cube of this.cubes) {
-            cube.render(gl, program, viewMatrix, projectionMatrix, 0.8); // Slight texture
+            cube.render(gl, program, viewMatrix, projectionMatrix, 0.2);
         }
     }
     
