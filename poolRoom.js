@@ -19,13 +19,7 @@ class PoolRoom {
         this.createLayout();
         
         // Initialize textures
-        this.textures = {
-            sky: null,
-            wall: null,
-            floor: null,
-            skyCeiling: null, // Added for new skybox
-            skyFloor: null    // Added for new skybox
-        };
+        this.textures = {};
         
         // Create texture objects
         this.createTextures();
@@ -162,90 +156,140 @@ class PoolRoom {
     createTextures() {
         const gl = this.gl;
         
-        // Keep existing wall and floor texture code
-        // Wall texture
-        this.textures.wall = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.wall);
+        // Initialize texture objects with procedural placeholders
+        this.textures = {
+            wall: this.createPlaceholderTexture([255, 255, 255, 255]),
+            floor: this.createPlaceholderTexture([240, 240, 240, 255]),
+            ceiling: this.createPlaceholderTexture([245, 245, 245, 255]),
+            water: this.createPlaceholderTexture([100, 180, 255, 200]),
+            poolBottom: this.createPlaceholderTexture([40, 100, 180, 255]),
+            sky: this.createPlaceholderTexture([135, 206, 235, 255]),
+            pillar: this.createPlaceholderTexture([220, 220, 220, 255])
+        };
         
-        const wallPixels = new Uint8Array([
-            255, 255, 255, 255,
-            250, 250, 250, 255,
-            250, 250, 250, 255,
-            255, 255, 255, 255
+        // Load image-based textures
+        this.loadTextureFromFile('textures/stone_bricks.png', 'wall');
+        this.loadTextureFromFile('textures/stone_bricks.png', 'floor');
+        this.loadTextureFromFile('textures/stone_bricks.png', 'ceiling');
+        this.loadTextureFromFile('textures/end_stone_bricks.png', 'pillar');
+        this.loadTextureFromFile('textures/dark_prismarine.png', 'poolBottom');
+        this.loadTextureFromFile('textures/skybox_render.jpg', 'sky');
+        
+        // Create a water texture (either load one or use procedural)
+        this.createWaterTexture();
+    }
+
+    // Create a placeholder texture with a specific color
+    createPlaceholderTexture(color) {
+        const gl = this.gl;
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        
+        // Create a 2x2 texture with the specified color
+        const pixels = new Uint8Array([
+            color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3]
         ]);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, wallPixels);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
         
-        // Floor texture
-        this.textures.floor = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.floor);
-        
-        const floorPixels = new Uint8Array([
-            255, 255, 255, 255, 240, 240, 240, 255, 255, 255, 255, 255, 240, 240, 240, 255,
-            240, 240, 240, 255, 255, 255, 255, 255, 240, 240, 240, 255, 255, 255, 255, 255,
-            255, 255, 255, 255, 240, 240, 240, 255, 255, 255, 255, 255, 240, 240, 240, 255,
-            240, 240, 240, 255, 255, 255, 255, 255, 240, 240, 240, 255, 255, 255, 255, 255
-        ]);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 4, 4, 0, gl.RGBA, gl.UNSIGNED_BYTE, floorPixels);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-        
-        // Add texture for skybox ceiling (sky blue)
-        this.textures.skyCeiling = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.skyCeiling);
-        
-        const skyBluePixels = new Uint8Array([
-            100, 170, 225, 255, 100, 170, 225, 255,
-            100, 170, 225, 255, 100, 170, 225, 255
-        ]);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, skyBluePixels);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-        
-        // Add texture for skybox floor (off-white)
-        this.textures.skyFloor = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.skyFloor);
-        
-        const offWhitePixels = new Uint8Array([
-            240, 238, 230, 255, 240, 238, 230, 255,
-            240, 238, 230, 255, 240, 238, 230, 255
-        ]);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, offWhitePixels);
+        // Set texture parameters
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
         
-        // Sky texture for walls
-        this.textures.sky = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.sky);
+        return texture;
+    }
+
+    // Load texture from file
+    loadTextureFromFile(url, textureKey) {
+        const gl = this.gl;
+        const image = new Image();
         
-        gl.texImage2D(
-            gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-            new Uint8Array([100, 170, 225, 255]) // Sky blue matching your image
-        );
-        
-        const skyImage = new Image();
-        skyImage.onload = () => {
-            gl.bindTexture(gl.TEXTURE_2D, this.textures.sky);
+        image.onload = () => {
+            gl.bindTexture(gl.TEXTURE_2D, this.textures[textureKey]);
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // Flip the image vertically
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, skyImage);
-            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); // Reset to default
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            
+            // Check if power of 2 image
+            if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+                gl.generateMipmap(gl.TEXTURE_2D);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            } else {
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            }
+            
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            console.log("Sky texture loaded successfully");
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); // Reset to default
+            console.log(`Texture ${textureKey} loaded from: ${url}`);
         };
-        skyImage.onerror = () => {
-            console.error("Failed to load sky texture");
+        
+        image.onerror = () => {
+            console.error(`Failed to load texture from: ${url}`);
         };
-        skyImage.src = 'textures/skybox_render.jpg';
+        
+        image.src = url;
+        
+        // Helper function to check if value is power of 2
+        function isPowerOf2(value) {
+            return (value & (value - 1)) === 0;
+        }
+    }
+
+    // Create a procedural water texture with animation capability
+    createWaterTexture() {
+        const gl = this.gl;
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        
+        // Create a canvas for drawing the water texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        
+        // Create a blue gradient
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        gradient.addColorStop(0, 'rgba(0, 140, 220, 0.7)');
+        gradient.addColorStop(0.5, 'rgba(0, 160, 240, 0.7)');
+        gradient.addColorStop(1, 'rgba(0, 140, 220, 0.7)');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add some wave patterns
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 2;
+        
+        for (let i = 0; i < 10; i++) {
+            ctx.beginPath();
+            ctx.moveTo(0, i * 12 + 10);
+            
+            // Create wavy line
+            for (let x = 0; x < canvas.width; x += 10) {
+                const y = i * 12 + 10 + Math.sin(x / 20) * 5;
+                ctx.lineTo(x, y);
+            }
+            
+            ctx.stroke();
+        }
+        
+        // Upload to WebGL
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        
+        this.textures.water = texture;
+        return texture;
     }
     
     // Build the 3D world based on the map
@@ -257,6 +301,7 @@ class PoolRoom {
             for (let z = 1; z < this.mapSize - 1; z++) {
                 const ceiling = new Cube(gl);
                 ceiling.setPosition(x, this.maxHeight + 0.5, z);
+                ceiling.type = 'ceiling'; // Tag as ceiling for texture selection
                 this.cubes.push(ceiling);
             }
         }
@@ -269,11 +314,34 @@ class PoolRoom {
                     for (let y = 0; y < height; y++) {
                         const cube = new Cube(gl);
                         cube.setPosition(x, y + 0.5, z);
+                        
+                        // Tag cube with its type for texture selection
+                        if (y === 0) {
+                            cube.type = 'floor'; // Ground level cubes are floor
+                        } else {
+                            // Special case for pillars/columns
+                            if ((x % 8 === 0 || x % 8 === 1) && 
+                                (z % 8 === 0 || z % 8 === 1) && 
+                                x > 0 && x < this.mapSize-2 && 
+                                z > 0 && z < this.mapSize-2) {
+                                cube.type = 'pillar'; // Structural columns/pillars
+                            } else {
+                                cube.type = 'wall'; // Regular walls
+                            }
+                        }
+                        
                         this.cubes.push(cube);
                     }
                 }
             }
         }
+        
+        // Create pool floor with special texture
+        const poolFloor = new Cube(gl);
+        poolFloor.setPosition(this.mapSize / 2 - 0.5, -1.05, this.mapSize / 2 - 0.5);
+        poolFloor.setScale(this.mapSize * 0.7, 0.1, this.mapSize * 0.7);
+        poolFloor.type = 'poolBottom';
+        this.poolFloor = poolFloor;
     }
     
     // Render the entire poolroom
@@ -281,63 +349,87 @@ class PoolRoom {
         const viewMatrix = camera.viewMatrix;
         const projectionMatrix = camera.projectionMatrix;
         
-        // Set baseColor uniform for objects
+        // Set shader uniforms
         const u_baseColor = gl.getUniformLocation(program, 'u_baseColor');
         const u_texColorWeight = gl.getUniformLocation(program, 'u_texColorWeight');
         const u_Sampler = gl.getUniformLocation(program, 'u_Sampler');
+        const u_TexScale = gl.getUniformLocation(program, 'u_TexScale'); // Added uniform for texture scaling
         
-        gl.uniform1i(u_Sampler, 0); // Tell shader to use texture unit 0 for the sampler
+        gl.uniform1i(u_Sampler, 0); // Use texture unit 0
 
-        // 1. First render the skybox background (ceiling and floor only)
+        // 1. First render the skybox background
         gl.depthFunc(gl.LEQUAL);
         
-        // For original skybox cube (ceiling and floor only)
-        // Use the sky ceiling texture for the top
-        // NOTE: A single cube cannot easily have different textures on different faces
-        // without more complex shader logic or multiple draw calls with culling.
-        // This approach will texture the whole cube with skyCeiling, then skyFloor.
-        // For distinct top/bottom, you'd need separate planes or a cubemap.
-
-        // Render skybox ceiling (using the whole skybox cube for now)
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.skyCeiling);
-        gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
-        gl.uniform1f(u_texColorWeight, 1.0);
-        // This will render the entire skybox cube with the ceiling texture.
-        // If you want a distinct floor, you'd need another object or a more complex setup.
-        this.skybox.render(gl, program, viewMatrix, projectionMatrix, 1.0); 
-        
-        // 2. Render the four skybox walls using the sky image texture
+        // Render skybox with sky texture
         gl.bindTexture(gl.TEXTURE_2D, this.textures.sky);
         gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
-        gl.uniform1f(u_texColorWeight, 1.0);
+        gl.uniform1f(u_texColorWeight, 1.0); // Full texture
         
+        // Render skybox
+        this.skybox.render(gl, program, viewMatrix, projectionMatrix, 1.0);
+        
+        // Render skybox walls
         for (const wall of this.skyboxWalls) {
             wall.render(gl, program, viewMatrix, projectionMatrix, 1.0);
         }
         
         gl.depthFunc(gl.LESS);
         
-        // 3. Render ground with floor texture
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.floor || this.textures.wall);
-        gl.uniform4f(u_baseColor, 0.95, 0.95, 0.95, 1.0); // Off-white
-        gl.uniform1f(u_texColorWeight, 0.3); // Subtle texture
-        this.ground.render(gl, program, viewMatrix, projectionMatrix, 0.3);
+        // 2. Render ground with floor texture
+        gl.bindTexture(gl.TEXTURE_2D, this.textures.floor);
+        gl.uniform4f(u_baseColor, 0.95, 0.95, 0.95, 1.0); // Off-white base
+        gl.uniform1f(u_texColorWeight, 0.8); // Strong texture influence
+        gl.uniform2f(u_TexScale, 4.0, 4.0); // 4x4 tiling for floor
+        this.ground.render(gl, program, viewMatrix, projectionMatrix, 0.8);
+        
+        // 3. Render pool floor with special texture
+        gl.bindTexture(gl.TEXTURE_2D, this.textures.poolBottom);
+        gl.uniform4f(u_baseColor, 0.8, 0.9, 1.0, 1.0); // Slightly blue tint
+        gl.uniform1f(u_texColorWeight, 0.9); // Strong texture influence
+        gl.uniform2f(u_TexScale, 1.0, 1.0); // 1x1 tiling for pool bottom
+        this.poolFloor.render(gl, program, viewMatrix, projectionMatrix, 0.9);
         
         // 4. Render pool water (with transparency)
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.uniform4f(u_baseColor, 0.0, 0.7, 0.95, 0.8); // Bright blue, semi-transparent
-        gl.uniform1f(u_texColorWeight, 0.0); // No texture, just color
-        this.poolWater.render(gl, program, viewMatrix, projectionMatrix, 0.0);
+        gl.bindTexture(gl.TEXTURE_2D, this.textures.water);
+        gl.uniform4f(u_baseColor, 0.0, 0.7, 0.95, 0.7); // Bright blue with transparency
+        gl.uniform1f(u_texColorWeight, 0.6); // Medium texture influence
+        gl.uniform2f(u_TexScale, 2.0, 2.0); // 2x2 tiling for water
+        this.poolWater.render(gl, program, viewMatrix, projectionMatrix, 0.6);
         gl.disable(gl.BLEND);
         
-        // 5. Render all walls and ceiling cubes
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.wall);
-        gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0); // Pure white
-        gl.uniform1f(u_texColorWeight, 0.2); // Subtle texture
-        
+        // 5. Render all walls, ceiling, and other cubes
         for (const cube of this.cubes) {
-            cube.render(gl, program, viewMatrix, projectionMatrix, 0.2);
+            // Select texture based on cube type
+            if (cube.type === 'ceiling') {
+                gl.bindTexture(gl.TEXTURE_2D, this.textures.ceiling);
+                gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0); // White
+                gl.uniform1f(u_texColorWeight, 0.9); // Strong texture influence
+                gl.uniform2f(u_TexScale, 1.0, 1.0); // 1x1 tiling for ceiling
+            }
+            else if (cube.type === 'floor') {
+                gl.bindTexture(gl.TEXTURE_2D, this.textures.floor);
+                gl.uniform4f(u_baseColor, 0.95, 0.95, 0.95, 1.0); // Off-white
+                gl.uniform1f(u_texColorWeight, 0.9); // Strong texture influence
+                gl.uniform2f(u_TexScale, 4.0, 4.0); // 4x4 tiling for floor
+            }
+            else if (cube.type === 'pillar') {
+                gl.bindTexture(gl.TEXTURE_2D, this.textures.pillar);
+                gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0); // White
+                gl.uniform1f(u_texColorWeight, 0.95); // Very strong texture influence
+                gl.uniform2f(u_TexScale, 1.0, 1.0); // 1x1 tiling for pillars
+            }
+            else {
+                // Default to wall texture for all other cubes
+                gl.bindTexture(gl.TEXTURE_2D, this.textures.wall);
+                gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0); // White
+                gl.uniform1f(u_texColorWeight, 0.85); // Strong texture influence
+                gl.uniform2f(u_TexScale, 1.0, 1.0); // 1x1 tiling for walls
+            }
+            
+            // Render the cube with appropriate texture
+            cube.render(gl, program, viewMatrix, projectionMatrix, 0.85);
         }
     }
     
