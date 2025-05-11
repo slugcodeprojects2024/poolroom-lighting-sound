@@ -1,8 +1,9 @@
-// main.js - Main application entry point
+// main.js - Main application entry point with collision detection and sprint
 let gl;
 let program;
 let camera;
 let poolRoom;
+let collisionHandler;
 let lastTime = 0;
 let keys = {};
 let mouseX = 0, mouseY = 0;
@@ -37,6 +38,10 @@ function init() {
     // Create the poolroom
     poolRoom = new PoolRoom(gl);
     
+    // Create collision handler and link it to camera
+    collisionHandler = new CollisionHandler(poolRoom);
+    camera.setCollisionHandler(collisionHandler);
+    
     // Set up event listeners
     setupEventListeners(canvas);
     
@@ -63,10 +68,30 @@ function setupEventListeners(canvas) {
     // Keyboard events
     document.addEventListener('keydown', function(event) {
         keys[event.key] = true;
+        
+        // Handle jump with spacebar
+        if (event.key === ' ') {
+            camera.jump();
+        }
+        
+        // Handle sprint with Shift key
+        if (event.key === 'Shift') {
+            camera.setSprint(true);
+        }
+        
+        // Toggle collision with 'C' key
+        if (event.key === 'c' || event.key === 'C') {
+            collisionHandler.toggleCollision();
+        }
     });
     
     document.addEventListener('keyup', function(event) {
         keys[event.key] = false;
+        
+        // Stop sprinting when Shift is released
+        if (event.key === 'Shift') {
+            camera.setSprint(false);
+        }
     });
     
     // Mouse movement events
@@ -130,7 +155,12 @@ function setupEventListeners(canvas) {
         // Add block with left click
         if (event.button === 0) {
             const pos = camera.getFrontGridPosition();
-            poolRoom.addBlock(pos.x, pos.y, pos.z);
+            const success = poolRoom.addBlock(pos.x, pos.y, pos.z);
+            
+            // Update collision objects if block was added
+            if (success) {
+                collisionHandler.updateCollisionObjects();
+            }
         }
     });
     
@@ -138,7 +168,12 @@ function setupEventListeners(canvas) {
         // Remove block with right click
         event.preventDefault();
         const pos = camera.getFrontGridPosition();
-        poolRoom.removeBlock(pos.x, pos.y, pos.z);
+        const success = poolRoom.removeBlock(pos.x, pos.y, pos.z);
+        
+        // Update collision objects if block was removed
+        if (success) {
+            collisionHandler.updateCollisionObjects();
+        }
     });
     
     // Window resize event
@@ -188,6 +223,9 @@ function render() {
     // Process keyboard input
     processInput(deltaTime);
     
+    // Update physics (gravity, stamina, etc.)
+    camera.updatePhysics(deltaTime);
+    
     // Clear the canvas
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -195,8 +233,36 @@ function render() {
     // Render the poolroom
     poolRoom.render(gl, program, camera);
     
+    // Display status information
+    updateStatusDisplay();
+    
     // Request next frame
     requestAnimationFrame(render);
+}
+
+// Update the status display
+function updateStatusDisplay() {
+    const statusDiv = document.getElementById('status');
+    if (statusDiv) {
+        const stamina = Math.round(camera.getStaminaPercentage());
+        const collisionEnabled = collisionHandler ? collisionHandler.enabled : true;
+        
+        let statusText = `Controls: WASD - Move | Mouse - Look | Q/E - Rotate<br>`;
+        statusText += `Space - Jump | Shift - Sprint | C - Toggle Collision<br>`;
+        statusText += `Left/Right Click - Add/Remove Blocks<br>`;
+        statusText += `Collision: ${collisionEnabled ? 'ON' : 'OFF'}`;
+        
+        if (camera.isSprinting) {
+            statusText += ` | SPRINTING`;
+        }
+        
+        statusDiv.innerHTML = statusText;
+    }
+    
+    // Update stamina bar
+    if (typeof updateStaminaBar === 'function') {
+        updateStaminaBar(camera.getStaminaPercentage());
+    }
 }
 
 // Start the application when the page loads

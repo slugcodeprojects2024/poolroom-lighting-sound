@@ -1,11 +1,12 @@
-// collision.js - Modified to work with the new PoolRoom class
+// collision.js - Simple collision detection for grid-based world
+// Fixed to work with the actual PoolRoom implementation
 
 class CollisionHandler {
     constructor(poolRoom) {
         this.poolRoom = poolRoom;
-        this.collisionObjects = [];
+        this.collisionBoxes = [];
         this.waterAreas = [];
-        this.enabled = false; // Collision detection starts disabled
+        this.enabled = true; // Collision detection starts enabled
         
         // Initialize collision objects if poolRoom is provided
         if (poolRoom) {
@@ -16,112 +17,97 @@ class CollisionHandler {
     // Toggle collision detection on/off
     toggleCollision() {
         this.enabled = !this.enabled;
-        console.log("Collision detection: " + (this.enabled ? "Enabled" : "Disabled"));
+        console.log(`Collision detection: ${this.enabled ? 'Enabled' : 'Disabled'}`);
         return this.enabled;
     }
     
     initCollisionObjects() {
-        // Create collision boxes for walls and other solid objects
-        const allSpaces = [...this.poolRoom.rooms, ...this.poolRoom.corridors];
+        // Clear existing collision objects
+        this.collisionBoxes = [];
+        this.waterAreas = [];
         
-        for (const room of allSpaces) {
-            // Create wall collision boxes only where walls exist
-            
-            // North wall
-            if (!this.poolRoom.hasAdjacentRoom(room, 'north')) {
-                this.collisionObjects.push({
-                    type: 'wall',
-                    minX: room.x,
-                    maxX: room.x + room.width,
-                    minY: room.y,
-                    maxY: room.y + room.height,
-                    minZ: room.z - 0.5,
-                    maxZ: room.z + 0.5
-                });
-            }
-            
-            // South wall
-            if (!this.poolRoom.hasAdjacentRoom(room, 'south')) {
-                this.collisionObjects.push({
-                    type: 'wall',
-                    minX: room.x,
-                    maxX: room.x + room.width,
-                    minY: room.y,
-                    maxY: room.y + room.height,
-                    minZ: room.z + room.length - 0.5,
-                    maxZ: room.z + room.length + 0.5
-                });
-            }
-            
-            // East wall
-            if (!this.poolRoom.hasAdjacentRoom(room, 'east')) {
-                this.collisionObjects.push({
-                    type: 'wall',
-                    minX: room.x + room.width - 0.5,
-                    maxX: room.x + room.width + 0.5,
-                    minY: room.y,
-                    maxY: room.y + room.height,
-                    minZ: room.z,
-                    maxZ: room.z + room.length
-                });
-            }
-            
-            // West wall
-            if (!this.poolRoom.hasAdjacentRoom(room, 'west')) {
-                this.collisionObjects.push({
-                    type: 'wall',
-                    minX: room.x - 0.5,
-                    maxX: room.x + 0.5,
-                    minY: room.y,
-                    maxY: room.y + room.height,
-                    minZ: room.z,
-                    maxZ: room.z + room.length
-                });
-            }
-            
-            // If room has a pool, add water area
-            if (room.hasPool) {
-                const poolMargin = 3;
-                this.waterAreas.push({
-                    type: 'water',
-                    minX: room.x + poolMargin,
-                    maxX: room.x + room.width - poolMargin,
-                    minY: room.y - room.poolDepth,
-                    maxY: room.y,
-                    minZ: room.z + poolMargin,
-                    maxZ: room.z + room.length - poolMargin
-                });
+        // Create collision boxes based on the map grid
+        if (!this.poolRoom.map) {
+            console.error('PoolRoom map not initialized');
+            return;
+        }
+        
+        for (let x = 0; x < this.poolRoom.mapSize; x++) {
+            for (let z = 0; z < this.poolRoom.mapSize; z++) {
+                const height = this.poolRoom.map[x][z];
+                
+                if (height > 0) {
+                    // Create collision box for wall blocks
+                    this.collisionBoxes.push({
+                        minX: x - 0.5,
+                        maxX: x + 0.5,
+                        minY: 0,
+                        maxY: height,
+                        minZ: z - 0.5,
+                        maxZ: z + 0.5
+                    });
+                }
             }
         }
+        
+        // Add pool water collision area
+        // Pool is in the center, 70% of map size
+        const poolSize = this.poolRoom.mapSize * 0.7;
+        const poolStart = (this.poolRoom.mapSize - poolSize) / 2;
+        
+        this.waterAreas.push({
+            minX: poolStart,
+            maxX: poolStart + poolSize,
+            minY: -1.0, // Below floor level
+            maxY: 0.05, // Water surface
+            minZ: poolStart,
+            maxZ: poolStart + poolSize
+        });
     }
     
-    // Check for collisions with a player's position
-    checkCollision(position, radius = 0.5) {
-        if (!this.enabled) return { collision: false };
+    // Check collision with walls - returns adjusted position
+    checkCollision(position, previousPosition, radius = 0.3) {
+        if (!this.enabled) return position;
         
-        for (const obj of this.collisionObjects) {
-            // Simple box-sphere collision check
-            const closestX = Math.max(obj.minX, Math.min(position[0], obj.maxX));
-            const closestY = Math.max(obj.minY, Math.min(position[1], obj.maxY));
-            const closestZ = Math.max(obj.minZ, Math.min(position[2], obj.maxZ));
-            
-            const distance = Math.sqrt(
-                (position[0] - closestX) * (position[0] - closestX) +
-                (position[1] - closestY) * (position[1] - closestY) +
-                (position[2] - closestZ) * (position[2] - closestZ)
-            );
-            
-            if (distance < radius) {
-                return {
-                    collision: true,
-                    object: obj
-                };
-            }
+        // Create a copy of the position to modify
+        let newPosition = [position[0], position[1], position[2]];
+        
+        // Check each axis separately for sliding collision
+        // Check X movement
+        let testPos = [newPosition[0], newPosition[1], previousPosition[2]];
+        if (this.isPositionColliding(testPos, radius)) {
+            newPosition[0] = previousPosition[0];
         }
         
-        return {
-            collision: false
-        };
+        // Check Z movement
+        testPos = [newPosition[0], newPosition[1], newPosition[2]];
+        if (this.isPositionColliding(testPos, radius)) {
+            newPosition[2] = previousPosition[2];
+        }
+        
+        // Check Y movement (for jumping/falling)
+        testPos = [newPosition[0], newPosition[1], newPosition[2]];
+        if (this.isPositionColliding(testPos, radius)) {
+            newPosition[1] = previousPosition[1];
+        }
+        
+        return newPosition;
+    }
+    
+    // Check if a position collides with any collision box
+    isPositionColliding(position, radius) {
+        for (const box of this.collisionBoxes) {
+            // Expand box by radius to account for player size
+            if (position[0] + radius > box.minX &&
+                position[0] - radius < box.maxX &&
+                position[1] + radius > box.minY &&
+                position[1] - radius < box.maxY &&
+                position[2] + radius > box.minZ &&
+                position[2] - radius < box.maxZ) {
+                return true;
+            }
+        }
+        return false;
     }
     
     // Check if player is in water
@@ -137,5 +123,24 @@ class CollisionHandler {
         }
         
         return false;
+    }
+    
+    // Get ground level at position (for gravity/floor detection)
+    getGroundLevel(x, z) {
+        // Check if position is over the pool
+        for (const water of this.waterAreas) {
+            if (x >= water.minX && x <= water.maxX &&
+                z >= water.minZ && z <= water.maxZ) {
+                return water.minY; // Return pool bottom
+            }
+        }
+        
+        // Otherwise return floor level
+        return 0.0;
+    }
+    
+    // Update collision objects when blocks are added/removed
+    updateCollisionObjects() {
+        this.initCollisionObjects();
     }
 }

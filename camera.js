@@ -1,8 +1,9 @@
-// camera.js - Update to create low-perspective camera
+// camera.js - Update to include collision detection and sprint, preserving scale illusion
 class Camera {
     constructor(gl) {
-        // Set up camera properties
-        this.position = new Vector3([16.0, 0.3, 16.0]); // Low position for scale illusion
+        // Set up camera properties - PRESERVE LOW POSITION FOR SCALE ILLUSION
+        this.position = new Vector3([16.0, 0.3, 16.0]); // Low position maintained for scale illusion
+        this.previousPosition = new Vector3([16.0, 0.3, 16.0]);
         this.front = new Vector3([0.0, 0.0, -1.0]);
         this.up = new Vector3([0.0, 1.0, 0.0]);
         this.right = new Vector3([1.0, 0.0, 0.0]);
@@ -11,12 +12,28 @@ class Camera {
         this.viewMatrix = new Matrix4();
         this.projectionMatrix = new Matrix4();
         
-        // Camera parameters
-        this.speed = 1.0; // Slower speed makes space feel larger
+        // Camera parameters - PRESERVE FOR SCALE ILLUSION
+        this.baseSpeed = 1.0; // Base movement speed (slow for scale illusion)
+        this.sprintMultiplier = 2.0; // Sprint speed multiplier
+        this.currentSpeed = this.baseSpeed;
         this.sensitivity = 0.15;
         this.yaw = -90.0; // Default looking forward
         this.pitch = 0.0;
-        this.fov = 70.0; // Wider FOV for immersive feel
+        this.fov = 70.0; // Wide FOV maintained for immersive feel
+        
+        // Physics properties
+        this.velocity = new Vector3([0, 0, 0]);
+        this.gravity = -2.5; // Reduced gravity to maintain scale illusion
+        this.jumpVelocity = 1.5; // Reduced jump height for scale
+        this.isGrounded = true;
+        this.collisionHandler = null; // Will be set from main.js
+        
+        // Sprint properties
+        this.isSprinting = false;
+        this.staminaMax = 100;
+        this.stamina = this.staminaMax;
+        this.staminaDrainRate = 20; // Stamina units per second while sprinting
+        this.staminaRegenRate = 10; // Stamina units per second while not sprinting
         
         // Set up projection matrix
         const canvas = gl.canvas;
@@ -25,6 +42,11 @@ class Camera {
         
         // Update matrices
         this.updateCameraVectors();
+    }
+    
+    // Set collision handler
+    setCollisionHandler(handler) {
+        this.collisionHandler = handler;
     }
     
     // Update camera vectors based on yaw and pitch
@@ -39,11 +61,9 @@ class Camera {
         this.front.normalize();
         
         // Recalculate right and up vectors
-        // right = normalize(cross(front, world up))
         this.right = Vector3.cross(this.front, new Vector3([0, 1, 0]));
         this.right.normalize();
         
-        // up = normalize(cross(right, front))
         this.up = Vector3.cross(this.right, this.front);
         this.up.normalize();
         
@@ -60,36 +80,140 @@ class Camera {
         );
     }
     
-    // Process keyboard input for movement
+    // Toggle sprint on/off
+    setSprint(sprinting) {
+        if (sprinting && this.stamina > 0) {
+            this.isSprinting = true;
+            this.currentSpeed = this.baseSpeed * this.sprintMultiplier;
+        } else {
+            this.isSprinting = false;
+            this.currentSpeed = this.baseSpeed;
+        }
+    }
+    
+    // Update stamina based on sprint state
+    updateStamina(deltaTime) {
+        if (this.isSprinting) {
+            // Drain stamina while sprinting
+            this.stamina -= this.staminaDrainRate * deltaTime;
+            if (this.stamina <= 0) {
+                this.stamina = 0;
+                this.setSprint(false); // Stop sprinting when out of stamina
+            }
+        } else {
+            // Regenerate stamina while not sprinting
+            this.stamina += this.staminaRegenRate * deltaTime;
+            if (this.stamina > this.staminaMax) {
+                this.stamina = this.staminaMax;
+            }
+        }
+    }
+    
+    // Process keyboard input for movement with collision detection
     processKeyboard(direction, deltaTime) {
-        const velocity = this.speed * deltaTime;
+        const velocity = this.currentSpeed * deltaTime;
+        
+        // Store previous position for collision detection
+        this.previousPosition.set(this.position);
+        
+        // Calculate new position based on input
+        let newPosition = new Vector3(this.position.elements);
         
         if (direction === 'FORWARD') {
-            // Move only in XZ plane for walking feel
             const moveVec = new Vector3(this.front.elements);
-            moveVec.elements[1] = 0; // Zero Y component
+            moveVec.elements[1] = 0; // Zero Y component for walking
             moveVec.normalize();
             moveVec.mul(velocity);
-            this.position.add(moveVec);
+            newPosition.add(moveVec);
         }
         if (direction === 'BACKWARD') {
             const moveVec = new Vector3(this.front.elements);
             moveVec.elements[1] = 0;
             moveVec.normalize();
             moveVec.mul(-velocity);
-            this.position.add(moveVec);
+            newPosition.add(moveVec);
         }
         if (direction === 'LEFT') {
-            this.position.elements[0] -= this.right.elements[0] * velocity;
-            this.position.elements[2] -= this.right.elements[2] * velocity;
+            newPosition.elements[0] -= this.right.elements[0] * velocity;
+            newPosition.elements[2] -= this.right.elements[2] * velocity;
         }
         if (direction === 'RIGHT') {
-            this.position.elements[0] += this.right.elements[0] * velocity;
-            this.position.elements[2] += this.right.elements[2] * velocity;
+            newPosition.elements[0] += this.right.elements[0] * velocity;
+            newPosition.elements[2] += this.right.elements[2] * velocity;
+        }
+        
+        // Apply collision detection if available
+        if (this.collisionHandler) {
+            const checkedPosition = this.collisionHandler.checkCollision(
+                newPosition.elements,
+                this.previousPosition.elements,
+                0.2 // Small player radius for scale illusion
+            );
+            
+            this.position.elements[0] = checkedPosition[0];
+            this.position.elements[1] = checkedPosition[1];
+            this.position.elements[2] = checkedPosition[2];
+        } else {
+            this.position.set(newPosition);
         }
         
         // Update view matrix after movement
         this.updateCameraVectors();
+    }
+    
+    // Update physics (gravity, jumping, etc.)
+    updatePhysics(deltaTime) {
+        if (!this.collisionHandler) return;
+        
+        // Update stamina
+        this.updateStamina(deltaTime);
+        
+        // Apply gravity
+        if (!this.isGrounded) {
+            this.velocity.elements[1] += this.gravity * deltaTime;
+        }
+        
+        // Apply velocity
+        const newPos = new Vector3(this.position.elements);
+        newPos.elements[0] += this.velocity.elements[0] * deltaTime;
+        newPos.elements[1] += this.velocity.elements[1] * deltaTime;
+        newPos.elements[2] += this.velocity.elements[2] * deltaTime;
+        
+        // Check ground collision - MAINTAIN LOW HEIGHT FOR SCALE
+        const groundLevel = this.collisionHandler.getGroundLevel(
+            this.position.elements[0],
+            this.position.elements[2]
+        ) + 0.3; // Low height maintained for scale illusion
+        
+        if (newPos.elements[1] <= groundLevel) {
+            newPos.elements[1] = groundLevel;
+            this.velocity.elements[1] = 0;
+            this.isGrounded = true;
+        } else {
+            this.isGrounded = false;
+        }
+        
+        // Apply collision detection
+        const checkedPosition = this.collisionHandler.checkCollision(
+            newPos.elements,
+            this.position.elements,
+            0.2 // Small radius for scale
+        );
+        
+        this.position.elements[0] = checkedPosition[0];
+        this.position.elements[1] = checkedPosition[1];
+        this.position.elements[2] = checkedPosition[2];
+        
+        // Update view matrix
+        this.updateCameraVectors();
+    }
+    
+    // Process jump input
+    jump() {
+        if (this.isGrounded) {
+            this.velocity.elements[1] = this.jumpVelocity;
+            this.isGrounded = false;
+        }
     }
     
     // Process mouse movement
@@ -134,5 +258,10 @@ class Camera {
             y: Math.round(pos.elements[1]),
             z: Math.round(pos.elements[2])
         };
+    }
+    
+    // Get stamina percentage for UI display
+    getStaminaPercentage() {
+        return (this.stamina / this.staminaMax) * 100;
     }
 }
