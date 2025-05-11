@@ -47,6 +47,9 @@ class CollisionHandler {
                         maxZ: z + 0.5
                     });
                 }
+                
+                // NO invisible barriers for window openings - we'll handle this differently
+                // Instead we'll use a boundary check in the checkCollision method
             }
         }
         
@@ -66,28 +69,53 @@ class CollisionHandler {
     }
     
     // Check collision with walls - returns adjusted position
-    checkCollision(position, previousPosition, radius = 0.3) {
+    checkCollision(position, previousPosition, radius = 0.15) { // Even smaller default radius
         if (!this.enabled) return position;
         
         // Create a copy of the position to modify
         let newPosition = [position[0], position[1], position[2]];
         
+        // Special window edge check - prevent falling through window but allow getting close
+        const isOutsideWorld = (
+            newPosition[0] < -0.45 || 
+            newPosition[0] > this.poolRoom.mapSize - 0.55 ||
+            newPosition[2] < -0.45 || 
+            newPosition[2] > this.poolRoom.mapSize - 0.55
+        );
+        
+        if (isOutsideWorld) {
+            console.log('Preventing falling outside world');
+            // Just reset to previous position if trying to go outside world boundaries
+            return previousPosition;
+        }
+        
+        // Detect if we're near a window edge and reduce collision radius further
+        const isNearEdge = (
+            newPosition[0] < 1.0 || 
+            newPosition[0] > this.poolRoom.mapSize - 2 ||
+            newPosition[2] < 1.0 || 
+            newPosition[2] > this.poolRoom.mapSize - 2
+        );
+        
+        // Ultra small radius near edges to get right up against windows
+        const effectiveRadius = isNearEdge ? 0.05 : radius;
+        
         // Check each axis separately for sliding collision
         // Check X movement
         let testPos = [newPosition[0], newPosition[1], previousPosition[2]];
-        if (this.isPositionColliding(testPos, radius)) {
+        if (this.isPositionColliding(testPos, effectiveRadius)) {
             newPosition[0] = previousPosition[0];
         }
         
         // Check Z movement
         testPos = [newPosition[0], newPosition[1], newPosition[2]];
-        if (this.isPositionColliding(testPos, radius)) {
+        if (this.isPositionColliding(testPos, effectiveRadius)) {
             newPosition[2] = previousPosition[2];
         }
         
         // Check Y movement (for jumping/falling)
         testPos = [newPosition[0], newPosition[1], newPosition[2]];
-        if (this.isPositionColliding(testPos, radius)) {
+        if (this.isPositionColliding(testPos, effectiveRadius)) {
             newPosition[1] = previousPosition[1];
         }
         

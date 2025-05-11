@@ -2,8 +2,8 @@
 class Camera {
     constructor(gl) {
         // Set up camera properties - PRESERVE LOW POSITION FOR SCALE ILLUSION
-        this.position = new Vector3([16.0, 0.3, 16.0]); // Low position maintained for scale illusion
-        this.previousPosition = new Vector3([16.0, 0.3, 16.0]);
+        this.position = new Vector3([3.0, 0.3, 12.0]); // Low position maintained for scale illusion
+        this.previousPosition = new Vector3([3.0, 0.3, 12.0]);
         this.front = new Vector3([0.0, 0.0, -1.0]);
         this.up = new Vector3([0.0, 1.0, 0.0]);
         this.right = new Vector3([1.0, 0.0, 0.0]);
