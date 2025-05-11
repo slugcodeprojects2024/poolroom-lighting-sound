@@ -48,8 +48,47 @@ class CollisionHandler {
                     });
                 }
                 
-                // NO invisible barriers for window openings - we'll handle this differently
-                // Instead we'll use a boundary check in the checkCollision method
+                // Add invisible barriers for window openings
+                // Check if this is a window opening (perimeter with height 0)
+                if (height === 0 && 
+                    (x === 0 || x === this.poolRoom.mapSize - 1 || 
+                     z === 0 || z === this.poolRoom.mapSize - 1)) {
+                    
+                    // Create a thin invisible barrier only at the actual opening
+                    // Adjust the barrier position based on which wall it's on
+                    let barrier = {
+                        minY: 0,
+                        maxY: 1.2, // Barrier height
+                    };
+                    
+                    if (x === 0) {
+                        // West wall - barrier pushed far outside
+                        barrier.minX = -0.50; // Half a unit outside the room
+                        barrier.maxX = -0.45; // Very thin barrier
+                        barrier.minZ = z - 0.5;
+                        barrier.maxZ = z + 0.5;
+                    } else if (x === this.poolRoom.mapSize - 1) {
+                        // East wall - barrier pushed far outside
+                        barrier.minX = x + 0.95; // Almost a full unit beyond the edge
+                        barrier.maxX = x + 1.0;  // Very thin barrier
+                        barrier.minZ = z - 0.5;
+                        barrier.maxZ = z + 0.5;
+                    } else if (z === 0) {
+                        // North wall - barrier pushed far outside
+                        barrier.minX = x - 0.5;
+                        barrier.maxX = x + 0.5;
+                        barrier.minZ = -0.50; // Half a unit outside the room
+                        barrier.maxZ = -0.45; // Very thin barrier
+                    } else if (z === this.poolRoom.mapSize - 1) {
+                        // South wall - barrier pushed far outside
+                        barrier.minX = x - 0.5;
+                        barrier.maxX = x + 0.5;
+                        barrier.minZ = z + 0.95; // Almost a full unit beyond the edge
+                        barrier.maxZ = z + 1.0;  // Very thin barrier
+                    }
+                    
+                    this.collisionBoxes.push(barrier);
+                }
             }
         }
         
@@ -58,6 +97,7 @@ class CollisionHandler {
         const poolSize = this.poolRoom.mapSize * 0.7;
         const poolStart = (this.poolRoom.mapSize - poolSize) / 2;
         
+        // Add water area definition
         this.waterAreas.push({
             minX: poolStart,
             maxX: poolStart + poolSize,
@@ -65,6 +105,26 @@ class CollisionHandler {
             maxY: 0.05, // Water surface
             minZ: poolStart,
             maxZ: poolStart + poolSize
+        });
+        
+        // Add pool bottom as a solid collision object
+        this.collisionBoxes.push({
+            minX: poolStart,
+            maxX: poolStart + poolSize,
+            minY: -1.05, // Slightly lower to catch fast movement
+            maxY: -0.85, // Thicker collision layer (0.2 units)
+            minZ: poolStart,
+            maxZ: poolStart + poolSize
+        });
+
+        // Add pool bottom as a solid collision object
+        this.collisionBoxes.push({
+            minX: poolStart - 0.1,  // Slightly wider than the pool
+            maxX: poolStart + poolSize + 0.1,
+            minY: -1.2, // Lower to catch very fast movement
+            maxY: -0.8, // Thicker collision layer (0.4 units)
+            minZ: poolStart - 0.1,  // Slightly wider than the pool
+            maxZ: poolStart + poolSize + 0.1
         });
     }
     
@@ -116,7 +176,21 @@ class CollisionHandler {
         // Check Y movement (for jumping/falling)
         testPos = [newPosition[0], newPosition[1], newPosition[2]];
         if (this.isPositionColliding(testPos, effectiveRadius)) {
-            newPosition[1] = previousPosition[1];
+            // Check if we're in water area (even slightly above or below the actual water)
+            const poolBottom = -1.0;
+            const isAbovePool = this.isPositionAbovePool(newPosition[0], newPosition[2]);
+            
+            if (isAbovePool) {
+                // We're in the pool area
+                if (newPosition[1] < poolBottom + effectiveRadius) {
+                    // Prevent falling through the pool bottom by setting a hard stop
+                    newPosition[1] = poolBottom + effectiveRadius;
+                    console.log('Enforcing pool bottom collision at:', newPosition[1]);
+                }
+            } else {
+                // For non-water collisions, just revert to previous position
+                newPosition[1] = previousPosition[1];
+            }
         }
         
         return newPosition;
@@ -153,13 +227,25 @@ class CollisionHandler {
         return false;
     }
     
+    // Check if position is near the pool bottom (to prevent falling through)
+    isNearPoolBottom(position, radius) {
+        for (const water of this.waterAreas) {
+            if (position[0] >= water.minX && position[0] <= water.maxX &&
+                position[1] >= water.minY - radius && position[1] <= water.minY + radius * 2 &&
+                position[2] >= water.minZ && position[2] <= water.maxZ) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     // Get ground level at position (for gravity/floor detection)
     getGroundLevel(x, z) {
         // Check if position is over the pool
         for (const water of this.waterAreas) {
             if (x >= water.minX && x <= water.maxX &&
                 z >= water.minZ && z <= water.maxZ) {
-                return water.minY; // Return pool bottom
+                return -1.0; // Return pool bottom level
             }
         }
         
@@ -170,5 +256,27 @@ class CollisionHandler {
     // Update collision objects when blocks are added/removed
     updateCollisionObjects() {
         this.initCollisionObjects();
+    }
+    
+    // Check if position is above the pool area
+    isPositionAbovePool(x, z) {
+        for (const water of this.waterAreas) {
+            if (x >= water.minX && x <= water.maxX &&
+                z >= water.minZ && z <= water.maxZ) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // Check if a position is above the pool area (regardless of Y)
+    isPositionAbovePool(x, z) {
+        for (const water of this.waterAreas) {
+            if (x >= water.minX && x <= water.maxX &&
+                z >= water.minZ && z <= water.maxZ) {
+                return true;
+            }
+        }
+        return false;
     }
 }
