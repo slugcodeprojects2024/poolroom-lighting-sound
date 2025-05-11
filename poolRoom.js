@@ -32,12 +32,20 @@ class PoolRoom {
         
         // Create ground plane and pool water
         this.ground = new Cube(gl);
-        this.ground.setPosition(this.mapSize/2 - 0.5, -0.05, this.mapSize/2 - 0.5);
+        this.ground.setPosition(this.mapSize / 2 - 0.5, -0.05, this.mapSize / 2 - 0.5);
         this.ground.setScale(this.mapSize, 0.1, this.mapSize);
-        
+
+        // Create pool water with DEEPER pool
         this.poolWater = new Cube(gl);
-        this.poolWater.setPosition(this.mapSize/2 - 0.5, 0.025, this.mapSize/2 - 0.5);
+        this.poolWater.setPosition(this.mapSize / 2 - 0.5, 0.025, this.mapSize / 2 - 0.5);
         this.poolWater.setScale(this.mapSize * 0.7, 0.05, this.mapSize * 0.7);
+
+        // Create pool floor (much deeper)
+        const poolSize = this.mapSize * 0.7;
+        const poolStart = (this.mapSize - poolSize) / 2;
+        this.poolFloor = new Cube(gl);
+        this.poolFloor.setPosition(this.mapSize / 2 - 0.5, -3.0, this.mapSize / 2 - 0.5); // Deeper pool floor
+        this.poolFloor.setScale(poolSize, 0.1, poolSize);
         
         // Create skybox components
         this.createSkybox(); // Call the new skybox creation method
