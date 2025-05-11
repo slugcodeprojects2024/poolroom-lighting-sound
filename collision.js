@@ -107,34 +107,101 @@ class CollisionHandler {
             maxZ: poolStart + poolSize
         });
         
-        // Add pool bottom as a solid collision object
+        // Add a SOLID pool floor with multiple layers to prevent falling through
+        // Pool bottom - make it thicker and overlap with water bottom slightly
+        this.collisionBoxes.push({
+            minX: poolStart - 0.5,  // Extend beyond pool edges
+            maxX: poolStart + poolSize + 0.5,
+            minY: -1.2, // Go below pool bottom
+            maxY: -0.9, // Extend slightly up into water
+            minZ: poolStart - 0.5,  // Extend beyond pool edges
+            maxZ: poolStart + poolSize + 0.5
+        });
+
+        // Add a SOLID pool floor collision box
         this.collisionBoxes.push({
             minX: poolStart,
             maxX: poolStart + poolSize,
-            minY: -1.05, // Slightly lower to catch fast movement
-            maxY: -0.85, // Thicker collision layer (0.2 units)
+            minY: -1.0, // Exact pool bottom
+            maxY: -0.9, // Slightly above the pool bottom
             minZ: poolStart,
             maxZ: poolStart + poolSize
         });
 
-        // Add pool bottom as a solid collision object
+        // Add a simple pool bottom collision box
         this.collisionBoxes.push({
-            minX: poolStart - 0.1,  // Slightly wider than the pool
-            maxX: poolStart + poolSize + 0.1,
-            minY: -1.2, // Lower to catch very fast movement
-            maxY: -0.8, // Thicker collision layer (0.4 units)
-            minZ: poolStart - 0.1,  // Slightly wider than the pool
-            maxZ: poolStart + poolSize + 0.1
+            minX: poolStart,
+            maxX: poolStart + poolSize,
+            minY: -1.0, // Pool bottom
+            maxY: -0.9, // Slightly above the bottom
+            minZ: poolStart,
+            maxZ: poolStart + poolSize
+        });
+        console.log("Pool bottom collision box added:", this.collisionBoxes[this.collisionBoxes.length - 1]);
+
+        // Update the pool bottom collision box
+        this.collisionBoxes.push({
+            minX: poolStart,
+            maxX: poolStart + poolSize,
+            minY: -0.5, // Raise the pool bottom to -0.5
+            maxY: -0.4, // Slightly above the pool bottom
+            minZ: poolStart,
+            maxZ: poolStart + poolSize
+        });
+
+        // Update the pool bottom collision box to raise it higher
+        this.collisionBoxes.push({
+            minX: poolStart,
+            maxX: poolStart + poolSize,
+            minY: -0.3, // Raise the pool bottom to -0.3
+            maxY: -0.2, // Slightly above the pool bottom
+            minZ: poolStart,
+            maxZ: poolStart + poolSize
+        });
+
+        // Update the pool bottom collision box to raise it higher
+        this.collisionBoxes.push({
+            minX: poolStart,
+            maxX: poolStart + poolSize,
+            minY: -0.2, // Raise the pool bottom to -0.2
+            maxY: -0.1, // Slightly above the pool bottom
+            minZ: poolStart,
+            maxZ: poolStart + poolSize
+        });
+
+        // Additional safety layer far below
+        this.collisionBoxes.push({
+            minX: 0,  // Cover the entire map
+            maxX: this.poolRoom.mapSize,
+            minY: -20.0, // Very far below 
+            maxY: -10.0, // Thick layer
+            minZ: 0,  // Cover the entire map
+            maxZ: this.poolRoom.mapSize
         });
     }
     
     // Check collision with walls - returns adjusted position
-    checkCollision(position, previousPosition, radius = 0.15) { // Even smaller default radius
+    checkCollision(position, previousPosition, radius = 0.15) { 
         if (!this.enabled) return position;
         
         // Create a copy of the position to modify
         let newPosition = [position[0], position[1], position[2]];
         
+        // CRITICAL FIX: First check if we're below the pool bottom
+        // If we're in the pool area and below -1.1, teleport immediately back up
+        if (this.isPositionAbovePool(newPosition[0], newPosition[2]) && newPosition[1] < -1.1) {
+            console.log('Emergency fix: Found player below pool floor, teleporting up');
+            newPosition[1] = -0.7; // Place just below water surface
+            
+            // Reset velocity to prevent continued falling
+            if (window.camera && window.camera.velocity) {
+                window.camera.velocity.elements[1] = 0;
+            }
+            
+            return newPosition;
+        }
+        
+        // Continue with the rest of the collision checks
         // Special window edge check - prevent falling through window but allow getting close
         const isOutsideWorld = (
             newPosition[0] < -0.45 || 
@@ -173,43 +240,46 @@ class CollisionHandler {
             newPosition[2] = previousPosition[2];
         }
         
-        // Check Y movement (for jumping/falling)
+        // Check Y movement (for jumping/falling) - improved pool detection
         testPos = [newPosition[0], newPosition[1], newPosition[2]];
         if (this.isPositionColliding(testPos, effectiveRadius)) {
-            // Check if we're in water area (even slightly above or below the actual water)
-            const poolBottom = -1.0;
-            const isAbovePool = this.isPositionAbovePool(newPosition[0], newPosition[2]);
-            
-            if (isAbovePool) {
-                // We're in the pool area
-                if (newPosition[1] < poolBottom + effectiveRadius) {
-                    // Prevent falling through the pool bottom by setting a hard stop
-                    newPosition[1] = poolBottom + effectiveRadius;
-                    console.log('Enforcing pool bottom collision at:', newPosition[1]);
-                }
+            const poolBottom = -1.0; // Pool bottom Y-coordinate
+            if (newPosition[1] < poolBottom + effectiveRadius) {
+                console.log("Correcting position to pool bottom");
+                newPosition[1] = poolBottom + effectiveRadius; // Stop at the pool bottom
             } else {
-                // For non-water collisions, just revert to previous position
-                newPosition[1] = previousPosition[1];
+                newPosition[1] = previousPosition[1]; // Revert to previous position
             }
         }
-        
+
+        // Add this critical emergency prevention code after the collision checks
+        // Super safety check - if somehow still falling through, teleport back up
+        if (this.isPositionAbovePool(newPosition[0], newPosition[2]) && newPosition[1] < -1.5) {
+            console.log('Emergency prevention: Teleporting from below pool');
+            newPosition[1] = -0.8; // Just below water surface
+            // Reset velocity
+            if (window.camera && window.camera.velocity) {
+                window.camera.velocity.elements[1] = 0;
+            }
+        }
+
         return newPosition;
     }
     
     // Check if a position collides with any collision box
     isPositionColliding(position, radius) {
         for (const box of this.collisionBoxes) {
-            // Expand box by radius to account for player size
             if (position[0] + radius > box.minX &&
                 position[0] - radius < box.maxX &&
                 position[1] + radius > box.minY &&
                 position[1] - radius < box.maxY &&
                 position[2] + radius > box.minZ &&
                 position[2] - radius < box.maxZ) {
-                return true;
+                console.log("Collision detected with box:", box);
+                return true; // Collision detected
             }
         }
-        return false;
+        return false; // No collision
     }
     
     // Check if player is in water
@@ -259,17 +329,6 @@ class CollisionHandler {
     }
     
     // Check if position is above the pool area
-    isPositionAbovePool(x, z) {
-        for (const water of this.waterAreas) {
-            if (x >= water.minX && x <= water.maxX &&
-                z >= water.minZ && z <= water.maxZ) {
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    // Check if a position is above the pool area (regardless of Y)
     isPositionAbovePool(x, z) {
         for (const water of this.waterAreas) {
             if (x >= water.minX && x <= water.maxX &&
