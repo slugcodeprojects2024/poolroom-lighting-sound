@@ -4,10 +4,16 @@ let program;
 let camera;
 let poolRoom;
 let collisionHandler;
+let blockIndicator;
 let lastTime = 0;
 let keys = {};
 let mouseX = 0, mouseY = 0;
 let mouseDown = false;
+
+// Add these variables at the top with your other global variables
+let frameCount = 0;
+let fpsTime = 0;
+let fps = 0;
 
 // Initialize WebGL context
 function init() {
@@ -41,6 +47,9 @@ function init() {
     // Create collision handler and link it to camera
     collisionHandler = new CollisionHandler(poolRoom);
     camera.setCollisionHandler(collisionHandler);
+    
+    // Create block indicator
+    blockIndicator = new BlockIndicator(gl);
     
     // Set up event listeners
     setupEventListeners(canvas);
@@ -83,6 +92,39 @@ function setupEventListeners(canvas) {
         if (event.key === 'c' || event.key === 'C') {
             collisionHandler.toggleCollision();
         }
+        
+        // Cycle block types with 'B' key
+        if (event.key === 'b' || event.key === 'B') {
+            if (blockIndicator) {
+                blockIndicator.cycleBlockType();
+            }
+        }
+        
+        // Add "F" key to place blocks as an alternative
+        if (event.key === 'f' || event.key === 'F') {
+            console.log("F key pressed - placing block");
+            const pos = camera.getTargetBlock(5.0, 0.1);
+            const blockType = blockIndicator.getCurrentBlockType();
+            const success = poolRoom.addBlock(pos.x, pos.y, pos.z, blockType);
+            
+            if (success) {
+                collisionHandler.updateCollisionObjects();
+                showNotification(`Block placed: ${blockIndicator.blockTypeNames[blockType]}`, 1000);
+            }
+        }
+        
+        // Add "G" key to remove the last block as an alternative
+        if (event.key === 'g' || event.key === 'G') {
+            console.log("G key pressed - removing block");
+            const success = poolRoom.removeLastBlock();
+            
+            if (success) {
+                collisionHandler.updateCollisionObjects();
+                showNotification('Last block removed', 1000);
+            } else {
+                showNotification('No blocks to remove', 1000);
+            }
+        }
     });
     
     document.addEventListener('keyup', function(event) {
@@ -106,37 +148,98 @@ function setupEventListeners(canvas) {
         }
     });
     
-    // Mouse button events
+    // Add separate mousedown and click handlers
     canvas.addEventListener('mousedown', function(event) {
+        // This just captures the initial mouse press
         mouseDown = true;
         mouseX = event.clientX;
         mouseY = event.clientY;
         
-        // Request pointer lock for mouse control
-        canvas.requestPointerLock = canvas.requestPointerLock ||
-                                    canvas.mozRequestPointerLock;
-        canvas.requestPointerLock();
+        // Request pointer lock if not already locked
+        if (document.pointerLockElement !== canvas && 
+            document.mozPointerLockElement !== canvas) {
+            canvas.requestPointerLock = canvas.requestPointerLock ||
+                                       canvas.mozRequestPointerLock;
+            canvas.requestPointerLock();
+        }
     });
-    
+
+    // Add dedicated click handler specifically for block placement
+    document.addEventListener('click', function(event) {
+        // Only process block placement when pointer is locked
+        if (document.pointerLockElement === canvas || 
+            document.mozPointerLockElement === canvas) {
+            
+            // Left-click to add block
+            if (event.button === 0) {
+                console.log("Left click detected - placing block");
+                const pos = camera.getTargetBlock(5.0, 0.1);
+                console.log("Target position:", pos);
+                const blockType = blockIndicator.getCurrentBlockType();
+                const success = poolRoom.addBlock(pos.x, pos.y, pos.z, blockType);
+                
+                // Update collision objects if block was added
+                if (success) {
+                    console.log("Block placed successfully");
+                    collisionHandler.updateCollisionObjects();
+                    showNotification(`Block placed: ${blockIndicator.blockTypeNames[blockType]}`, 1000);
+                } else {
+                    console.log("Failed to place block");
+                }
+            }
+        }
+    });
+
+    // Right-click handler for block removal
+    canvas.addEventListener('contextmenu', function(event) {
+        // Prevent browser context menu
+        event.preventDefault();
+        
+        // Only process when pointer is locked
+        if (document.pointerLockElement === canvas || 
+            document.mozPointerLockElement === canvas) {
+            
+            console.log("Right click detected - removing block");
+            // Remove the last placed block
+            const success = poolRoom.removeLastBlock();
+            
+            // Update collision objects if block was removed
+            if (success) {
+                collisionHandler.updateCollisionObjects();
+                showNotification('Last block removed', 1000);
+            } else {
+                showNotification('No blocks to remove', 1000);
+            }
+        }
+    });
+
     document.addEventListener('mouseup', function() {
         mouseDown = false;
         
-        // Exit pointer lock
-        document.exitPointerLock = document.exitPointerLock ||
-                                   document.mozExitPointerLock;
-        document.exitPointerLock();
+        // Don't exit pointer lock when releasing mouse button
+        // This allows for continuous camera control
     });
-    
+
     // Pointer lock change event
     document.addEventListener('pointerlockchange', lockChangeAlert, false);
     document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
+
+    // Add pointer lock error handling
+    document.addEventListener('pointerlockerror', function() {
+        console.error("Error obtaining pointer lock");
+    }, false);
+    document.addEventListener('mozpointerlockerror', function() {
+        console.error("Error obtaining pointer lock (moz)");
+    }, false);
     
     function lockChangeAlert() {
         if (document.pointerLockElement === canvas ||
             document.mozPointerLockElement === canvas) {
+            console.log("Pointer locked successfully");
             // Pointer locked - enable mouse movement tracking
             document.addEventListener('mousemove', updatePosition, false);
         } else {
+            console.log("Pointer unlocked");
             // Pointer unlocked - disable mouse movement tracking
             document.removeEventListener('mousemove', updatePosition, false);
         }
@@ -149,32 +252,6 @@ function setupEventListeners(canvas) {
         
         camera.processMouseMovement(xOffset, yOffset);
     }
-    
-    // Mouse click for block manipulation
-    canvas.addEventListener('click', function(event) {
-        // Add block with left click
-        if (event.button === 0) {
-            const pos = camera.getFrontGridPosition();
-            const success = poolRoom.addBlock(pos.x, pos.y, pos.z);
-            
-            // Update collision objects if block was added
-            if (success) {
-                collisionHandler.updateCollisionObjects();
-            }
-        }
-    });
-    
-    canvas.addEventListener('contextmenu', function(event) {
-        // Remove block with right click
-        event.preventDefault();
-        const pos = camera.getFrontGridPosition();
-        const success = poolRoom.removeBlock(pos.x, pos.y, pos.z);
-        
-        // Update collision objects if block was removed
-        if (success) {
-            collisionHandler.updateCollisionObjects();
-        }
-    });
     
     // Window resize event
     window.addEventListener('resize', function() {
@@ -220,6 +297,15 @@ function render() {
     const deltaTime = (currentTime - lastTime) / 1000.0; // Convert to seconds
     lastTime = currentTime;
     
+    // FPS calculation
+    frameCount++;
+    fpsTime += deltaTime;
+    if (fpsTime >= 1.0) { // Update FPS every second
+        fps = Math.round(frameCount / fpsTime);
+        frameCount = 0;
+        fpsTime = 0;
+    }
+    
     // Process keyboard input
     processInput(deltaTime);
     
@@ -230,11 +316,20 @@ function render() {
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
+    // Update block indicator position
+    blockIndicator.update(camera);
+    
     // Render the poolroom
     poolRoom.render(gl, program, camera);
     
+    // Render the block indicator
+    blockIndicator.render(gl, program, camera.viewMatrix, camera.projectionMatrix);
+    
     // Display status information
     updateStatusDisplay();
+    
+    // Update FPS counter
+    updateFpsCounter();
     
     // Request next frame
     requestAnimationFrame(render);
@@ -249,8 +344,8 @@ function updateStatusDisplay() {
         
         let statusText = `Controls: WASD - Move | Mouse - Look | Q/E - Rotate<br>`;
         statusText += `Space - Jump | Shift - Sprint | C - Toggle Collision<br>`;
-        statusText += `Left/Right Click - Add/Remove Blocks<br>`;
-        statusText += `Collision: ${collisionEnabled ? 'ON' : 'OFF'}`;
+        statusText += `Left Click/F - Place Block | Right Click/G - Remove Block<br>`; // Updated controls
+        statusText += `B - Cycle Block Types | Collision: ${collisionEnabled ? 'ON' : 'OFF'} | FPS: ${fps}`; // Added FPS counter
         
         if (camera.isSprinting) {
             statusText += ` | SPRINTING`;
@@ -262,6 +357,23 @@ function updateStatusDisplay() {
     // Update stamina bar
     if (typeof updateStaminaBar === 'function') {
         updateStaminaBar(camera.getStaminaPercentage());
+    }
+}
+
+// Add this function to update the FPS counter
+function updateFpsCounter() {
+    const fpsElement = document.getElementById('fps-counter');
+    if (fpsElement) {
+        fpsElement.textContent = `FPS: ${fps}`;
+        
+        // Colorize based on performance
+        if (fps >= 45) {
+            fpsElement.style.color = '#00ff00'; // Good - green
+        } else if (fps >= 30) {
+            fpsElement.style.color = '#ffff00'; // OK - yellow
+        } else {
+            fpsElement.style.color = '#ff0000'; // Bad - red
+        }
     }
 }
 
