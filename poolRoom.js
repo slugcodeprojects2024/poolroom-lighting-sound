@@ -24,6 +24,9 @@ class PoolRoom {
         // Create texture objects
         this.createTextures();
         
+        // Create specialized skybox textures
+        this.createSkyboxTextures();
+        
         // Create ground plane and pool water
         this.ground = new Cube(gl);
         this.ground.setPosition(this.mapSize / 2 - 0.5, -0.05, this.mapSize / 2 - 0.5);
@@ -40,6 +43,40 @@ class PoolRoom {
         this.poolFloor = new Cube(gl);
         this.poolFloor.setPosition(this.mapSize / 2 - 0.5, -3.0, this.mapSize / 2 - 0.5); // Deeper pool floor
         this.poolFloor.setScale(poolSize, 0.1, poolSize);
+
+        // Create pool walls to show depth
+        const wallDepth = 1.0; // How deep the pool appears visually
+
+        // Create four walls surrounding the pool
+        this.poolWalls = [];
+
+        // North wall
+        const northWall = new Cube(gl);
+        northWall.setPosition(this.mapSize / 2 - 0.5, -wallDepth/2, poolStart);
+        northWall.setScale(poolSize, wallDepth, 0.1);
+        northWall.type = 'poolWall';
+        this.poolWalls.push(northWall);
+
+        // South wall
+        const southWall = new Cube(gl);
+        southWall.setPosition(this.mapSize / 2 - 0.5, -wallDepth/2, poolStart + poolSize);
+        southWall.setScale(poolSize, wallDepth, 0.1);
+        southWall.type = 'poolWall';
+        this.poolWalls.push(southWall);
+
+        // East wall
+        const eastWall = new Cube(gl);
+        eastWall.setPosition(poolStart, -wallDepth/2, this.mapSize / 2 - 0.5);
+        eastWall.setScale(0.1, wallDepth, poolSize);
+        eastWall.type = 'poolWall';
+        this.poolWalls.push(eastWall);
+
+        // West wall
+        const westWall = new Cube(gl);
+        westWall.setPosition(poolStart + poolSize, -wallDepth/2, this.mapSize / 2 - 0.5);
+        westWall.setScale(0.1, wallDepth, poolSize);
+        westWall.type = 'poolWall';
+        this.poolWalls.push(westWall);
         
         // Create skybox components
         this.createSkybox(); // Call the new skybox creation method
@@ -105,57 +142,36 @@ class PoolRoom {
         }
     }
 
-    // Create individual skybox planes
+    // Make sure your createSkybox method creates these with different Y positions:
     createSkybox() {
         const gl = this.gl;
         
-        // Keep the existing skybox cube for the ceiling and floor
-        this.skybox = new Cube(gl);
-        this.skybox.setPosition(0, 0, 0);
-        this.skybox.setScale(400, 400, 400);
-        this.skybox.isOriginalSkybox = true;
+        // Create separate cubes for walls, ceiling, and floor
+        this.skyboxWalls = new Cube(gl);
+        this.skyboxWalls.setPosition(this.mapSize / 2 - 0.5, 0, this.mapSize / 2 - 0.5);
+        this.skyboxWalls.setScale(800, 800, 800);
         
-        // Add four walls with the skybox image texture
-        this.skyboxWalls = [];
+        // Position ceiling slightly higher so its bottom doesn't interfere
+        this.skyboxCeiling = new Cube(gl);
+        this.skyboxCeiling.setPosition(this.mapSize / 2 - 0.5, 400, this.mapSize / 2 - 0.5);
+        this.skyboxCeiling.setScale(800, 0.01, 800); // Make it thin so only top face shows
         
-        // Distance for positioning walls
-        const distance = 100;
-        const height = 300; // Match the cube height
-        const width = 300;  // Match the cube width
-        
-        // Create north wall (front)
-        const northWall = new Cube(gl);
-        northWall.setPosition(this.mapSize/2 - 0.5, 0, -distance);
-        northWall.setScale(width, height, 0.1);
-        northWall.isWall = true;
-        this.skyboxWalls.push(northWall);
-        
-        // Create south wall (back)
-        const southWall = new Cube(gl);
-        southWall.setPosition(this.mapSize/2 - 0.5, 0, this.mapSize + distance);
-        southWall.setScale(width, height, 0.1);
-        southWall.isWall = true;
-        this.skyboxWalls.push(southWall);
-        
-        // Create east wall (right)
-        const eastWall = new Cube(gl);
-        eastWall.setPosition(this.mapSize + distance, 0, this.mapSize/2 - 0.5);
-        eastWall.setScale(0.1, height, width);
-        eastWall.isWall = true;
-        this.skyboxWalls.push(eastWall);
-        
-        // Create west wall (left)
-        const westWall = new Cube(gl);
-        westWall.setPosition(-distance, 0, this.mapSize/2 - 0.5);
-        westWall.setScale(0.1, height, width);
-        westWall.isWall = true;
-        this.skyboxWalls.push(westWall);
+        // Position floor slightly lower and make it clearly separate from the walls
+        this.skyboxFloor = new Cube(gl);
+        this.skyboxFloor.setPosition(this.mapSize / 2 - 0.5, -401, this.mapSize / 2 - 0.5); // Move it down a bit more
+        this.skyboxFloor.setScale(799, 0.01, 799); // Make it slightly smaller to avoid z-fighting
+
+        // Create a dedicated ground plane WAY below everything
+        // This will be our "distant floor" that matches the skybox
+        this.skyboxGroundPlane = new Cube(gl); 
+        this.skyboxGroundPlane.setPosition(this.mapSize / 2 - 0.5, -200, this.mapSize / 2 - 0.5);
+        this.skyboxGroundPlane.setScale(2000, 0.1, 2000); // Make it VERY large to cover everything
     }
     
     // Create textures programmatically
     createTextures() {
         const gl = this.gl;
-        
+
         // Initialize texture objects with procedural placeholders
         this.textures = {
             wall: this.createPlaceholderTexture([40, 100, 180, 255]),     // Dark blue for walls
@@ -163,20 +179,230 @@ class PoolRoom {
             ceiling: this.createPlaceholderTexture([40, 100, 180, 255]),   // Dark blue for ceiling
             water: this.createPlaceholderTexture([100, 180, 255, 200]),    // Light blue transparent for water
             poolBottom: this.createPlaceholderTexture([240, 240, 240, 255]), // Light gray for pool bottom
-            sky: this.createPlaceholderTexture([135, 206, 235, 255]),      // Sky blue
+            skyboxCeiling: this.createPlaceholderTexture([135, 206, 250, 255]), // Sky blue for ceiling
+            skyboxFloor: this.createPlaceholderTexture([200, 200, 230, 255]),    // Light gray-blue for floor
+            skyboxWall: this.createPlaceholderTexture([120, 180, 255, 255]),     // Light blue for walls
             pillar: this.createPlaceholderTexture([220, 220, 220, 255])    // Light gray for pillars
         };
-        
+
         // Load image-based textures with the correct assignment
         this.loadTextureFromFile('textures/end_stone_bricks.png', 'floor');      // End stone bricks for floor
         this.loadTextureFromFile('textures/stone_bricks.png', 'poolBottom');     // Stone bricks for pool bottom
         this.loadTextureFromFile('textures/end_stone_bricks.png', 'wall');       // End stone bricks for walls  
         this.loadTextureFromFile('textures/end_stone_bricks.png', 'ceiling');    // End stone bricks for ceiling
         this.loadTextureFromFile('textures/dark_prismarine.png', 'pillar');      // Dark prismarine for pillars
-        this.loadTextureFromFile('textures/skybox_render.jpg', 'sky');           // Skybox image
-        
+
+        // Load skybox textures: each face gets its own texture
+        this.loadTextureFromFile('textures/sky_texture.jpg', 'skyboxCeiling');   // Sky ceiling texture
+        this.loadTextureFromFile('textures/skyfloor_texture.jpg', 'skyboxFloor', {
+            wrapS: gl.CLAMP_TO_EDGE,  // Add edge clamping
+            wrapT: gl.CLAMP_TO_EDGE   // Add edge clamping
+        }); // Sky floor texture
+        this.loadTextureFromFile('textures/skybox_render.jpg', 'skyboxWall');    // Skybox render for walls
+
         // Create a water texture (procedural)
         this.createEnhancedWaterTexture();
+    }
+
+    // Create specialized skybox textures
+    createSkyboxTextures() {
+        // We'll use the image-based skybox texture instead of procedural generation
+        // The textures.sky will be loaded from loadTextureFromFile in createTextures()
+    }
+
+    // Create a sky ceiling texture with clouds
+    createSkyCeilingTexture() {
+        const gl = this.gl;
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        
+        // Create a canvas for the sky
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;  // Larger texture for better quality
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        // Create a gradient from lighter blue at center to slightly darker at edges
+        const gradient = ctx.createRadialGradient(
+            canvas.width/2, canvas.height/2, 0,
+            canvas.width/2, canvas.height/2, canvas.width/2
+        );
+        gradient.addColorStop(0, 'rgb(135, 206, 250)');  // Sky blue at center
+        gradient.addColorStop(1, 'rgb(100, 180, 255)');  // Slightly darker at edges
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add some clouds
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        
+        // Helper function to draw a cloud
+        function drawCloud(x, y, size) {
+            const numBubbles = 5 + Math.floor(Math.random() * 5);
+            for (let i = 0; i < numBubbles; i++) {
+                const bubbleX = x + (Math.random() * 2 - 1) * size;
+                const bubbleY = y + (Math.random() * 2 - 1) * size/2;
+                const radius = (0.3 + Math.random() * 0.7) * size;
+                
+                ctx.beginPath();
+                ctx.arc(bubbleX, bubbleY, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        // Draw several clouds
+        for (let i = 0; i < 15; i++) {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            const size = 20 + Math.random() * 40;
+            
+            drawCloud(x, y, size);
+        }
+        
+        // Upload to WebGL
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        
+        return texture;
+    }
+
+    // Create a sky floor texture (distant ground)
+    createSkyFloorTexture() {
+        const gl = this.gl;
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        
+        // Create a canvas for the distant ground
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        // Create a gradient from lighter to darker
+        const gradient = ctx.createRadialGradient(
+            canvas.width/2, canvas.height/2, 0,
+            canvas.width/2, canvas.height/2, canvas.width/2
+        );
+        gradient.addColorStop(0, 'rgb(230, 230, 255)');  // Light blue-white in center
+        gradient.addColorStop(1, 'rgb(200, 200, 230)');  // Slightly darker at edges
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add some faint grid lines for perspective
+        ctx.strokeStyle = 'rgba(180, 180, 220, 0.3)';
+        ctx.lineWidth = 1;
+        
+        // Draw grid pattern
+        const spacing = 20;
+        for (let x = 0; x < canvas.width; x += spacing) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        }
+        
+        for (let y = 0; y < canvas.height; y += spacing) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+        }
+        
+        // Upload to WebGL
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        
+        return texture;
+    }
+
+    // Create a unified sky texture with gradient and clouds
+    createSkyTexture() {
+        const gl = this.gl;
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        
+        // Create a canvas for the sky
+        const canvas = document.createElement('canvas');
+        canvas.width = 1024;  // Larger texture for better quality
+        canvas.height = 1024;
+        const ctx = canvas.getContext('2d');
+        
+        // Create a gradient from blue at the top to lighter blue/white at the horizon
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, 'rgb(80, 150, 240)');    // Sky blue at top
+        gradient.addColorStop(0.5, 'rgb(120, 180, 255)');  // Mid blue
+        gradient.addColorStop(0.8, 'rgb(180, 220, 255)');  // Light blue at horizon
+        gradient.addColorStop(1, 'rgb(220, 230, 255)');    // Almost white at bottom
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add some clouds
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        
+        // Helper function to draw a cloud
+        function drawCloud(x, y, size) {
+            const numBubbles = 5 + Math.floor(Math.random() * 5);
+            for (let i = 0; i < numBubbles; i++) {
+                const bubbleX = x + (Math.random() * 2 - 1) * size;
+                const bubbleY = y + (Math.random() * 2 - 1) * size/2;
+                const radius = (0.3 + Math.random() * 0.7) * size;
+                
+                ctx.beginPath();
+                ctx.arc(bubbleX, bubbleY, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        // Draw several clouds concentrated in the upper part of the texture
+        for (let i = 0; i < 25; i++) {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height * 0.6; // Keep clouds in upper 60% of texture
+            const size = 20 + Math.random() * 50;
+            
+            drawCloud(x, y, size);
+        }
+        
+        // Add distant terrain silhouette near the horizon
+        ctx.fillStyle = 'rgba(100, 120, 160, 0.3)';
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height * 0.85);
+        
+        // Create a jagged mountain-like silhouette
+        for (let x = 0; x < canvas.width; x += canvas.width/20) {
+            const height = canvas.height * (0.8 + Math.random() * 0.1);
+            ctx.lineTo(x, height);
+        }
+        ctx.lineTo(canvas.width, canvas.height * 0.85);
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.lineTo(0, canvas.height);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Upload to WebGL
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        
+        return texture;
     }
 
     // Create a placeholder texture with a specific color
@@ -311,7 +537,7 @@ class PoolRoom {
         for (let x = 0; x < canvas.width; x += 16) {
             ctx.beginPath();
             ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvas.height);
+            ctx.lineTo(canvas.width, x);
             ctx.stroke();
         }
         
@@ -423,22 +649,29 @@ class PoolRoom {
         
         gl.uniform1i(u_Sampler, 0); // Use texture unit 0
 
-        // 1. First render the skybox background
+        // Render with the separate skyboxes
         gl.depthFunc(gl.LEQUAL);
 
-        // Ensure skybox texture is bound and using correct parameters
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.sky);
-        gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);  // Pure white to show true texture colors
-        gl.uniform1f(u_texColorWeight, 1.0);            // Full texture influence
-        gl.uniform2f(u_TexScale, 1.0, 1.0);             // No tiling for skybox
+        // 1. First render the walls
+        gl.bindTexture(gl.TEXTURE_2D, this.textures.skyboxWall);
+        gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
+        gl.uniform1f(u_texColorWeight, 1.0);
+        gl.uniform2f(u_TexScale, 1.0, 1.0);
+        this.skyboxWalls.render(gl, program, viewMatrix, projectionMatrix, 1.0);
 
-        // Render skybox
-        this.skybox.render(gl, program, viewMatrix, projectionMatrix, 1.0);
-
-        // Render skybox walls
-        for (const wall of this.skyboxWalls) {
-            wall.render(gl, program, viewMatrix, projectionMatrix, 1.0);
-        }
+        // 2. Then render the ceiling
+        gl.bindTexture(gl.TEXTURE_2D, this.textures.skyboxCeiling);
+        gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
+        gl.uniform1f(u_texColorWeight, 1.0);
+        gl.uniform2f(u_TexScale, 1.0, 1.0);
+        this.skyboxCeiling.render(gl, program, viewMatrix, projectionMatrix, 1.0);
+        
+        // 3. Render the dedicated ground plane with skyfloor texture
+        gl.bindTexture(gl.TEXTURE_2D, this.textures.skyboxFloor);
+        gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
+        gl.uniform1f(u_texColorWeight, 1.0);
+        gl.uniform2f(u_TexScale, 500.0, 500.0); // Dramatically increase from 1.0 to 500.0 for tiny squares
+        this.skyboxGroundPlane.render(gl, program, viewMatrix, projectionMatrix, 1.0);
 
         gl.depthFunc(gl.LESS);
         
@@ -446,14 +679,14 @@ class PoolRoom {
         gl.bindTexture(gl.TEXTURE_2D, this.textures.floor);
         gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
         gl.uniform1f(u_texColorWeight, 0.95); // Stronger texture influence
-        gl.uniform2f(u_TexScale, 8.0, 8.0);   // 8x8 tiling for finer floor detail
+        gl.uniform2f(u_TexScale, 64.0, 64.0);   // 8x8 tiling for finer floor detail
         this.ground.render(gl, program, viewMatrix, projectionMatrix, 0.95);
         
         // 3. Render pool floor with stone bricks texture
         gl.bindTexture(gl.TEXTURE_2D, this.textures.poolBottom);
         gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
         gl.uniform1f(u_texColorWeight, 0.95);
-        gl.uniform2f(u_TexScale, 4.0, 4.0);   // 4x4 tiling for pool bottom
+        gl.uniform2f(u_TexScale, 32.0, 32.0);   // 4x4 tiling for pool bottom
         this.poolFloor.render(gl, program, viewMatrix, projectionMatrix, 0.95);
         
         // 4. Render pool water (with transparency)

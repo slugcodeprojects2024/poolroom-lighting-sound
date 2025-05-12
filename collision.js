@@ -97,12 +97,12 @@ class CollisionHandler {
         const poolSize = this.poolRoom.mapSize * 0.7;
         const poolStart = (this.poolRoom.mapSize - poolSize) / 2;
         
-        // Add water area definition
+        // Add water area definition with proper depth now
         this.waterAreas.push({
             minX: poolStart,
             maxX: poolStart + poolSize,
-            minY: -1.0, // Below floor level
-            maxY: 0.05, // Water surface
+            minY: -1.0, // Bottom of water volume
+            maxY: -0.05, // Water surface is slightly below ground level
             minZ: poolStart,
             maxZ: poolStart + poolSize
         });

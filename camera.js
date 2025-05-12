@@ -168,6 +168,9 @@ class Camera {
         // Update stamina
         this.updateStamina(deltaTime);
         
+        // Update water physics if in pool
+        this.updateWaterPhysics(deltaTime);
+        
         // Apply gravity
         if (!this.isGrounded) {
             this.velocity.elements[1] += this.gravity * deltaTime;
@@ -206,6 +209,41 @@ class Camera {
         
         // Update view matrix
         this.updateCameraVectors();
+    }
+    
+    // Handle water physics when in water
+    updateWaterPhysics(deltaTime) {
+        if (!this.collisionHandler) return;
+        
+        // Check if in water
+        const isInWater = this.collisionHandler.isInWater(this.position.elements);
+        
+        if (isInWater) {
+            // Apply buoyancy - counteracts gravity when in water
+            const buoyancy = 1.8; // Adjust to control floating force
+            this.velocity.elements[1] += buoyancy * deltaTime;
+            
+            // Apply water resistance - slows movement in all directions
+            const waterResistance = 0.92;
+            this.velocity.elements[0] *= waterResistance;
+            this.velocity.elements[1] *= waterResistance; // Slower vertical movement in water
+            this.velocity.elements[2] *= waterResistance;
+            
+            // Reduce jump force when in water
+            this.jumpVelocity = 0.8; // Lower jump in water
+            
+            // Reduce speed when in water
+            this.currentSpeed = this.baseSpeed * 0.6;
+            
+            // Add visual effects for water (if desired)
+            // e.g., screen overlay, sound effects, etc.
+        } else {
+            // Reset to normal physics when out of water
+            this.jumpVelocity = 1.5; // Normal jump height
+            
+            // Reset speed based on sprint state
+            this.currentSpeed = this.isSprinting ? (this.baseSpeed * this.sprintMultiplier) : this.baseSpeed;
+        }
     }
     
     // Process jump input
