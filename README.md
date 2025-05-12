@@ -57,7 +57,6 @@ Settings:     B - Cycle Block Types | C - Toggle Collision
 ## Requirements
 - Modern web browser with WebGL support
 - Keyboard and mouse
-
 ---
 
 *This project was created as part of CSE 160 (Introduction to Computer Graphics) coursework.*
