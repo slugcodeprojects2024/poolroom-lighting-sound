@@ -21,6 +21,17 @@ class PoolRoom {
         // Initialize textures
         this.textures = {};
         
+        // Add block types array for different block materials
+        this.blockTypes = [
+            { name: 'Default', textureKey: 'wall' },      // Default - use wall texture
+            { name: 'Stone', textureKey: 'stone' },       // Stone block
+            { name: 'Wood', textureKey: 'wood' },         // Wood block
+            { name: 'Glass', textureKey: 'glass' }        // Glass block
+        ];
+        
+        // Track placed blocks for easy removal
+        this.placedBlocks = [];
+        
         // Create texture objects
         this.createTextures();
         
@@ -185,12 +196,23 @@ class PoolRoom {
             pillar: this.createPlaceholderTexture([220, 220, 220, 255])    // Light gray for pillars
         };
 
+        // Add textures for different block types
+        this.textures.stone = this.createPlaceholderTexture([120, 120, 120, 255]); // Grey for stone
+        this.textures.wood = this.createPlaceholderTexture([150, 100, 50, 255]);   // Brown for wood
+        this.textures.glass = this.createPlaceholderTexture([200, 230, 255, 180]); // Light blue semi-transparent for glass
+
         // Load image-based textures with the correct assignment
         this.loadTextureFromFile('textures/end_stone_bricks.png', 'floor');      // End stone bricks for floor
         this.loadTextureFromFile('textures/stone_bricks.png', 'poolBottom');     // Stone bricks for pool bottom
         this.loadTextureFromFile('textures/end_stone_bricks.png', 'wall');       // End stone bricks for walls  
         this.loadTextureFromFile('textures/end_stone_bricks.png', 'ceiling');    // End stone bricks for ceiling
         this.loadTextureFromFile('textures/dark_prismarine.png', 'pillar');      // Dark prismarine for pillars
+        this.loadTextureFromFile('textures/stone.jpg', 'stone');          // Stone texture
+        this.loadTextureFromFile('textures/wood.jpg', 'wood');             // Wood texture
+        this.loadTextureFromFile('textures/glass.jpg', 'glass', {                // Glass texture
+            wrapS: gl.CLAMP_TO_EDGE,
+            wrapT: gl.CLAMP_TO_EDGE
+        });
 
         // Load skybox textures: each face gets its own texture
         this.loadTextureFromFile('textures/sky_texture.jpg', 'skyboxCeiling');   // Sky ceiling texture
@@ -720,6 +742,28 @@ class PoolRoom {
                 gl.uniform1f(u_texColorWeight, 1.0);          // Increase texture influence to 100%
                 gl.uniform2f(u_TexScale, 1.0, 1.0);           // 1x1 tiling to see full texture
             }
+            else if (cube.type === 'stone') {
+                gl.bindTexture(gl.TEXTURE_2D, this.textures.stone);
+                gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
+                gl.uniform1f(u_texColorWeight, 1.0);
+                gl.uniform2f(u_TexScale, 1.0, 1.0);
+            }
+            else if (cube.type === 'wood') {
+                gl.bindTexture(gl.TEXTURE_2D, this.textures.wood);
+                gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
+                gl.uniform1f(u_texColorWeight, 1.0);
+                gl.uniform2f(u_TexScale, 1.0, 1.0);
+            }
+            else if (cube.type === 'glass') {
+                // Enable blending for glass blocks
+                gl.enable(gl.BLEND);
+                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                
+                gl.bindTexture(gl.TEXTURE_2D, this.textures.glass);
+                gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 0.7); // Semi-transparent
+                gl.uniform1f(u_texColorWeight, 0.8);
+                gl.uniform2f(u_TexScale, 1.0, 1.0);
+            }
             else {
                 gl.bindTexture(gl.TEXTURE_2D, this.textures.wall);
                 gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
@@ -729,14 +773,26 @@ class PoolRoom {
             
             // Render the cube with appropriate texture
             cube.render(gl, program, viewMatrix, projectionMatrix, 0.85);
+
+            // After the cube is rendered, if it was glass, disable blending
+            if (cube.type === 'glass') {
+                gl.disable(gl.BLEND);
+            }
         }
     }
     
     // Add a block at a position
-    addBlock(x, y, z) {
+    addBlock(x, y, z, blockType = 0) {
         // Validate coordinates
         if (x < 0 || x >= this.mapSize || z < 0 || z >= this.mapSize || y < 0 || y >= this.maxHeight) {
+            console.log("Block position out of bounds:", x, y, z);
             return false;
+        }
+        
+        // Validate block type
+        if (blockType < 0 || blockType >= this.blockTypes.length) {
+            console.log("Invalid block type:", blockType);
+            blockType = 0; // Default to first type if invalid
         }
         
         // Update map
@@ -745,35 +801,116 @@ class PoolRoom {
         // Create a new cube
         const cube = new Cube(this.gl);
         cube.setPosition(x, y + 0.5, z);
+        
+        // Make the block smaller - scale to 0.35 of original size
+        cube.setScale(0.35, 0.35, 0.35);
+        
+        // Set block type
+        cube.type = this.blockTypes[blockType].textureKey;
+        cube.blockType = blockType;
+        
+        // Add to cubes array
         this.cubes.push(cube);
         
+        // Store reference in placedBlocks array for tracking
+        this.placedBlocks.push({
+            cube: cube,
+            index: this.cubes.length - 1,
+            position: { x, y, z }
+        });
+        
+        console.log("Block added successfully:", cube.type);
         return true;
     }
     
-    // Remove a block at a position
+    // Remove a block at a specific position
     removeBlock(x, y, z) {
+        console.log("Attempting to remove block at:", x, y, z);
+        
         // Find the cube at this position
         for (let i = 0; i < this.cubes.length; i++) {
             const cube = this.cubes[i];
             const matrix = cube.modelMatrix.elements;
             
-            // Check position (matrix[12], matrix[13], matrix[14] are the translation components)
-            if (Math.abs(matrix[12] - x) < 0.1 && 
-                Math.abs(matrix[13] - (y + 0.5)) < 0.1 && 
-                Math.abs(matrix[14] - z) < 0.1) {
+            // Check position with increased tolerance for scaled blocks
+            if (Math.abs(matrix[12] - x) < 0.5 && 
+                Math.abs(matrix[13] - (y + 0.5)) < 0.5 && 
+                Math.abs(matrix[14] - z) < 0.5) {
+                
+                console.log("Found matching block at index:", i);
                 
                 // Remove the cube
                 this.cubes.splice(i, 1);
+                
+                // Update placedBlocks array
+                for (let j = 0; j < this.placedBlocks.length; j++) {
+                    if (this.placedBlocks[j].cube === cube) {
+                        this.placedBlocks.splice(j, 1);
+                        break;
+                    }
+                }
                 
                 // Update the map
                 if (this.map[x][z] > y) {
                     this.map[x][z] = y;
                 }
                 
+                console.log("Block removed successfully");
                 return true;
             }
         }
         
+        console.log("No block found at position:", x, y, z);
+        return false;
+    }
+
+    // Remove the last placed block (for easier undo functionality)
+    removeLastBlock() {
+        // Check if there are any blocks to remove
+        if (this.placedBlocks.length === 0) {
+            console.log("No blocks to remove");
+            return false;
+        }
+        
+        // Get the last placed block
+        const lastBlock = this.placedBlocks.pop();
+        
+        // Get its position
+        const pos = lastBlock.position;
+        
+        // Find its current index (may have changed if other blocks were removed)
+        let currentIndex = -1;
+        for (let i = 0; i < this.cubes.length; i++) {
+            if (this.cubes[i] === lastBlock.cube) {
+                currentIndex = i;
+                break;
+            }
+        }
+        
+        // If found, remove it
+        if (currentIndex !== -1) {
+            this.cubes.splice(currentIndex, 1);
+            
+            // Update the map if needed (only if it's the highest block at this position)
+            if (this.map[pos.x][pos.z] > pos.y) {
+                // Find the new highest block at this location
+                let newHeight = 0;
+                
+                // Check each placed block
+                for (const block of this.placedBlocks) {
+                    if (block.position.x === pos.x && block.position.z === pos.z) {
+                        newHeight = Math.max(newHeight, block.position.y + 1);
+                    }
+                }
+                
+                this.map[pos.x][pos.z] = newHeight;
+            }
+            
+            console.log("Removed last placed block at", pos);
+            return true;
+        }
+        
+        console.log("Failed to remove last block - not found in cubes array");
         return false;
     }
 }
