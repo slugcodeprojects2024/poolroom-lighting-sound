@@ -96,9 +96,9 @@ class PoolRoom {
             this.map[this.mapSize-1][x+1] = 0;
         }
         
-        // Add some structural columns/pillars
-        for (let x = 8; x < this.mapSize - 8; x += 8) {
-            for (let z = 8; z < this.mapSize - 8; z += 8) {
+        // Add some structural columns/pillars - more for better proportions
+        for (let x = 8; x < this.mapSize - 8; x += 6) {
+            for (let z = 8; z < this.mapSize - 8; z += 6) {
                 this.map[x][z] = this.maxHeight;
             }
         }
@@ -263,12 +263,8 @@ class PoolRoom {
         canvas.height = 512;
         const ctx = canvas.getContext('2d');
         
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-        gradient.addColorStop(0, 'rgba(0, 120, 200, 0.6)');
-        gradient.addColorStop(0.5, 'rgba(30, 160, 230, 0.6)');
-        gradient.addColorStop(1, 'rgba(0, 120, 200, 0.6)');
-        
-        ctx.fillStyle = gradient;
+        // Base water color
+        ctx.fillStyle = 'rgba(100, 150, 200, 0.7)'; // Light blue, base opacity 0.7
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
@@ -314,26 +310,53 @@ class PoolRoom {
             }
         }
         
-        // Create walls based on the map - FIXED to extend to floor
+        // Create walls based on the map
         for (let x = 0; x < this.mapSize; x++) {
             for (let z = 0; z < this.mapSize; z++) {
                 const height = this.map[x][z];
+
+                // ---- START DEBUG LOGGING ----
+                // Log info for cells that are part of the 2x2 pillar structures
+                // Pillars are at (8,8), (8,16), (16,8), (16,16) and their +1 offsets
+                const isPotentialPillarLocation = 
+                    ((x >= 8 && x <= 9) || (x >= 16 && x <= 17)) &&
+                    ((z >= 8 && z <= 9) || (z >= 16 && z <= 17));
+
+                if (isPotentialPillarLocation && height > 0) {
+                    console.log(`PillarDebug: Cell (${x},${z}): map_height=${height}, this.maxHeight=${this.maxHeight}`);
+                }
+                // ---- END DEBUG LOGGING ----
+
                 if (height > 0) {
-                    // Create a single stretched cube for each pillar/wall section
-                    const wallCube = new Cube(gl);
-                    wallCube.setPosition(x, height / 2, z);
-                    wallCube.setScale(1, height, 1);
-                    
-                    // Check if this is a pillar location
-                    if (x % 8 === 0 && z % 8 === 0 && 
-                        x > 0 && x < this.mapSize-1 && 
-                        z > 0 && z < this.mapSize-1) {
-                        wallCube.type = 'pillar';
-                    } else {
-                        wallCube.type = 'wall';
+                    const isOuterWall = (x === 0 || x === this.mapSize - 1 || z === 0 || z === this.mapSize - 1);
+                    const isPillarCell = (height === this.maxHeight && !isOuterWall);
+
+                    // ---- START DEBUG LOGGING ----
+                    if (isPotentialPillarLocation && height > 0) {
+                         console.log(`PillarDebug: Cell (${x},${z}): isPillarCell=${isPillarCell}, isOuterWall=${isOuterWall}`);
                     }
+                    // ---- END DEBUG LOGGING ----
                     
-                    this.cubes.push(wallCube);
+                    let startY = 0;
+                    if (isPillarCell) {
+                        startY = -1; 
+                    }
+
+                    for (let y = startY; y < height; y++) { 
+                        const cube = new Cube(gl);
+                        cube.setPosition(x, y + 0.5, z); 
+                        
+                        if (isPillarCell) {
+                            cube.type = 'pillar';
+                        } else {
+                            if (y === 0) { 
+                                cube.type = 'floor'; 
+                            } else {
+                                cube.type = 'wall'; 
+                            }
+                        }
+                        this.cubes.push(cube);
+                    }
                 }
             }
         }
@@ -460,16 +483,21 @@ class PoolRoom {
         // 7. Render pool water with transparency
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        
+        gl.depthMask(false); // Disable depth writes for transparent water
+
         gl.bindTexture(gl.TEXTURE_2D, this.textures.water);
-        gl.uniform4f(u_baseColor, 0.2, 0.6, 0.9, 0.6);
-        gl.uniform1f(u_texColorWeight, 0.8);
-        gl.uniform2f(u_TexScale, 4.0, 4.0);
+        gl.uniform4f(u_baseColor, 0.2, 0.6, 0.9, 0.6); 
+        gl.uniform1f(u_texColorWeight, 0.8); 
+        gl.uniform2f(u_TexScale, 4.0, 4.0); 
         if (this.poolWater) {
-            this.poolWater.render(gl, program, viewMatrix, projectionMatrix, 0.8);
+            this.poolWater.render(gl, program, viewMatrix, projectionMatrix, 0.8); 
         }
+        
+        gl.depthMask(true); // Re-enable depth writes for subsequent opaque objects
         gl.disable(gl.BLEND);
         
-        // 8. Render all walls, ceiling, and other cubes
+        // 8. Render all walls, ceiling, and other cubes (including pillars)
         for (const cube of this.cubes) {
             // Select texture and scale based on cube type
             if (cube.type === 'ceiling') {
