@@ -7,6 +7,9 @@ class PoolRoom {
         this.map = [];
         this.cubes = [];
         
+        // Define poolSize as a class property
+        this.poolSize = this.mapSize * 0.7;
+        
         // Initialize the map
         for (let x = 0; x < this.mapSize; x++) {
             this.map[x] = [];
@@ -20,63 +23,39 @@ class PoolRoom {
         
         // Initialize textures
         this.textures = {};
-        
-        // Create texture objects
-        this.createTextures();
+        this.createEnhancedWaterTexture();  // Create water texture first
+        this.createTextures();              // Then create other textures
         
         // Create specialized skybox textures
         this.createSkyboxTextures();
         
-        // Create ground plane and pool water
-        this.ground = new Cube(gl);
-        this.ground.setPosition(this.mapSize / 2 - 0.5, -0.05, this.mapSize / 2 - 0.5);
-        this.ground.setScale(this.mapSize, 0.1, this.mapSize);
-
-        // Create pool water with adjusted position
-        this.poolWater = new Cube(gl);
-        this.poolWater.setPosition(this.mapSize / 2 - 0.5, -0.1, this.mapSize / 2 - 0.5); // Slightly lower
-        this.poolWater.setScale(this.mapSize * 0.7, 0.05, this.mapSize * 0.7);
-
-        // Create pool floor (much deeper)
-        const poolSize = this.mapSize * 0.7;
-        const poolStart = (this.mapSize - poolSize) / 2;
-        this.poolFloor = new Cube(gl);
-        this.poolFloor.setPosition(this.mapSize / 2 - 0.5, -1.0, this.mapSize / 2 - 0.5);
-        this.poolFloor.setScale(poolSize, 0.1, poolSize);
-
-        // Create pool walls to show depth
-        const wallDepth = 1.0; // How deep the pool appears visually
-
-        // Create four walls surrounding the pool
-        this.poolWalls = [];
-
-        // North wall
-        const northWall = new Cube(gl);
-        northWall.setPosition(this.mapSize / 2 - 0.5, -0.5, poolStart);
-        northWall.setScale(poolSize, 1.0, 0.1);
-        northWall.type = 'poolWall';
-        this.poolWalls.push(northWall);
-
-        // South wall
-        const southWall = new Cube(gl);
-        southWall.setPosition(this.mapSize / 2 - 0.5, -wallDepth/2, poolStart + poolSize);
-        southWall.setScale(poolSize, wallDepth, 0.1);
-        southWall.type = 'poolWall';
-        this.poolWalls.push(southWall);
-
-        // East wall
-        const eastWall = new Cube(gl);
-        eastWall.setPosition(poolStart, -wallDepth/2, this.mapSize / 2 - 0.5);
-        eastWall.setScale(0.1, wallDepth, poolSize);
-        eastWall.type = 'poolWall';
-        this.poolWalls.push(eastWall);
-
-        // West wall
-        const westWall = new Cube(gl);
-        westWall.setPosition(poolStart + poolSize, -wallDepth/2, this.mapSize / 2 - 0.5);
-        westWall.setScale(0.1, wallDepth, poolSize);
-        westWall.type = 'poolWall';
-        this.poolWalls.push(westWall);
+        // Create ground sections around the pool
+        this.groundSections = [];
+        const poolStart = (this.mapSize - this.poolSize) / 2;
+        
+        // North section (above pool)
+        const northGround = new Cube(gl);
+        northGround.setPosition(this.mapSize / 2 - 0.5, -0.05, poolStart / 2);
+        northGround.setScale(this.mapSize, 0.1, poolStart);
+        this.groundSections.push(northGround);
+        
+        // South section (below pool)
+        const southGround = new Cube(gl);
+        southGround.setPosition(this.mapSize / 2 - 0.5, -0.05, poolStart + this.poolSize + poolStart / 2);
+        southGround.setScale(this.mapSize, 0.1, poolStart);
+        this.groundSections.push(southGround);
+        
+        // West section (left of pool)
+        const westGround = new Cube(gl);
+        westGround.setPosition(poolStart / 2, -0.05, poolStart + this.poolSize / 2);
+        westGround.setScale(poolStart, 0.1, this.poolSize);
+        this.groundSections.push(westGround);
+        
+        // East section (right of pool) 
+        const eastGround = new Cube(gl);
+        eastGround.setPosition(poolStart + this.poolSize + poolStart / 2, -0.05, poolStart + this.poolSize / 2);
+        eastGround.setScale(poolStart, 0.1, this.poolSize);
+        this.groundSections.push(eastGround);
         
         // Create skybox components
         this.createSkybox(); // Call the new skybox creation method
@@ -211,9 +190,6 @@ class PoolRoom {
             wrapT: gl.CLAMP_TO_EDGE   // Add edge clamping
         }); // Sky floor texture
         this.loadTextureFromFile('textures/skybox_render.jpg', 'skyboxWall');    // Skybox render for walls
-
-        // Create a water texture (procedural)
-        this.createEnhancedWaterTexture();
 
         // Add pool wall texture loading
         this.loadTextureFromFile('textures/stone_bricks.png', 'poolWall');
@@ -520,68 +496,33 @@ class PoolRoom {
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
         
-        // Create a larger canvas for more detailed water
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
+        canvas.width = 512;  // Increased resolution
+        canvas.height = 512;
         const ctx = canvas.getContext('2d');
         
-        // Fill with base water color gradient
+        // Create a more sophisticated water effect
         const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-        gradient.addColorStop(0, 'rgba(0, 120, 200, 0.7)');   // Darker blue
-        gradient.addColorStop(0.3, 'rgba(10, 140, 220, 0.7)'); // Mid blue
-        gradient.addColorStop(0.7, 'rgba(20, 160, 240, 0.7)'); // Lighter blue
-        gradient.addColorStop(1, 'rgba(0, 120, 200, 0.7)');   // Back to darker blue
+        gradient.addColorStop(0, 'rgba(0, 120, 200, 0.6)');   // Darker blue
+        gradient.addColorStop(0.5, 'rgba(30, 160, 230, 0.6)'); // Mid blue
+        gradient.addColorStop(1, 'rgba(0, 120, 200, 0.6)');   // Back to darker
         
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Add a subtle grid pattern (Minecraft-like water)
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = 1;
-        
-        // Horizontal grid lines
-        for (let y = 0; y < canvas.height; y += 16) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-            ctx.stroke();
-        }
-        
-        // Vertical grid lines
-        for (let x = 0; x < canvas.width; x += 16) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(canvas.width, x);
-            ctx.stroke();
-        }
-        
-        // Add wave patterns
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        // Add subtle wave patterns
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.lineWidth = 2;
         
-        for (let i = 0; i < 15; i++) {
+        // Create wave effect
+        for (let i = 0; i < 20; i++) {
             ctx.beginPath();
-            ctx.moveTo(0, i * 18 + 5);
+            ctx.moveTo(0, i * 25);
             
-            // Create wavy line with varying amplitude
-            for (let x = 0; x < canvas.width; x += 10) {
-                const y = i * 18 + 5 + Math.sin(x / 20 + i) * 6;
+            for (let x = 0; x < canvas.width; x += 5) {
+                const y = i * 25 + Math.sin(x / 30 + i) * 10;
                 ctx.lineTo(x, y);
             }
-            
-            ctx.stroke();
-        }
-        
-        // Add some brighter highlights
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-        for (let i = 0; i < 10; i++) {
-            const x = Math.random() * canvas.width;
-            const y = Math.random() * canvas.height;
-            const size = 5 + Math.random() * 15;
-            
-            ctx.beginPath();
-            ctx.arc(x, y, size, 0, Math.PI * 2);
             ctx.stroke();
         }
         
@@ -589,10 +530,13 @@ class PoolRoom {
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
         gl.generateMipmap(gl.TEXTURE_2D);
+        
+        // Set texture parameters for better water appearance
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         
         this.textures.water = texture;
@@ -646,9 +590,48 @@ class PoolRoom {
         // Create pool floor with special texture
         const poolFloor = new Cube(gl);
         poolFloor.setPosition(this.mapSize / 2 - 0.5, -1.05, this.mapSize / 2 - 0.5);
-        poolFloor.setScale(this.mapSize * 0.7, 0.1, this.mapSize * 0.7);
+        poolFloor.setScale(this.poolSize, 0.1, this.poolSize);
         poolFloor.type = 'poolBottom';
         this.poolFloor = poolFloor;
+
+        // Create the pool water surface
+        this.poolWater = new Cube(gl);
+        // Position it slightly above the pool floor, centered with the pool
+        this.poolWater.setPosition(this.mapSize / 2 - 0.5, -0.45, this.mapSize / 2 - 0.5); // y = -0.45 to be above floor
+        this.poolWater.setScale(this.poolSize, 0.1, this.poolSize); // Thin layer of water
+        this.poolWater.type = 'water'; // Assign a type for potential specific handling if needed
+
+        // After creating this.poolFloor in buildWorld or constructor:
+        this.poolWalls = [];
+
+        // Calculate pool wall positions (as a border around the pool)
+        const poolX = this.mapSize / 2 - 0.5;
+        const poolZ = this.mapSize / 2 - 0.5;
+        const halfPool = this.poolSize / 2;
+
+        // North wall
+        const northWall = new Cube(gl);
+        northWall.setPosition(poolX, -0.5, poolZ - halfPool);
+        northWall.setScale(this.poolSize, 1, 0.2);
+        this.poolWalls.push(northWall);
+
+        // South wall
+        const southWall = new Cube(gl);
+        southWall.setPosition(poolX, -0.5, poolZ + halfPool);
+        southWall.setScale(this.poolSize, 1, 0.2);
+        this.poolWalls.push(southWall);
+
+        // West wall
+        const westWall = new Cube(gl);
+        westWall.setPosition(poolX - halfPool, -0.5, poolZ);
+        westWall.setScale(0.2, 1, this.poolSize);
+        this.poolWalls.push(westWall);
+
+        // East wall
+        const eastWall = new Cube(gl);
+        eastWall.setPosition(poolX + halfPool, -0.5, poolZ);
+        eastWall.setScale(0.2, 1, this.poolSize);
+        this.poolWalls.push(eastWall);
     }
     
     // Render the entire poolroom
@@ -660,9 +643,9 @@ class PoolRoom {
         const u_baseColor = gl.getUniformLocation(program, 'u_baseColor');
         const u_texColorWeight = gl.getUniformLocation(program, 'u_texColorWeight');
         const u_Sampler = gl.getUniformLocation(program, 'u_Sampler');
-        const u_TexScale = gl.getUniformLocation(program, 'u_TexScale'); // Added uniform for texture scaling
+        const u_TexScale = gl.getUniformLocation(program, 'u_TexScale');
         
-        gl.uniform1i(u_Sampler, 0); // Use texture unit 0
+        gl.uniform1i(u_Sampler, 0);
 
         // Render with the separate skyboxes
         gl.depthFunc(gl.LEQUAL);
@@ -685,45 +668,55 @@ class PoolRoom {
         gl.bindTexture(gl.TEXTURE_2D, this.textures.skyboxFloor);
         gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
         gl.uniform1f(u_texColorWeight, 1.0);
-        gl.uniform2f(u_TexScale, 500.0, 500.0); // Dramatically increase from 1.0 to 500.0 for tiny squares
+        gl.uniform2f(u_TexScale, 500.0, 500.0);
         this.skyboxGroundPlane.render(gl, program, viewMatrix, projectionMatrix, 1.0);
 
         gl.depthFunc(gl.LESS);
         
-        // 2. Render ground with floor texture
+        // 4. Render ground sections
         gl.bindTexture(gl.TEXTURE_2D, this.textures.floor);
         gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
-        gl.uniform1f(u_texColorWeight, 0.95); // Stronger texture influence
-        gl.uniform2f(u_TexScale, 64.0, 64.0);   // 8x8 tiling for finer floor detail
-        this.ground.render(gl, program, viewMatrix, projectionMatrix, 0.95);
+        gl.uniform1f(u_texColorWeight, 0.95);
+        gl.uniform2f(u_TexScale, 64.0, 64.0);
         
-        // 3. Render pool floor with stone bricks texture
+        for (const groundSection of this.groundSections) {
+            groundSection.render(gl, program, viewMatrix, projectionMatrix, 0.95);
+        }
+        
+        // 5. Render pool floor with stone bricks texture
         gl.bindTexture(gl.TEXTURE_2D, this.textures.poolBottom);
         gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
         gl.uniform1f(u_texColorWeight, 0.95);
-        gl.uniform2f(u_TexScale, 32.0, 32.0);   // 4x4 tiling for pool bottom
+        gl.uniform2f(u_TexScale, 32.0, 32.0);
         this.poolFloor.render(gl, program, viewMatrix, projectionMatrix, 0.95);
         
-        // 4. Render pool water (with transparency)
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.water);
-        gl.uniform4f(u_baseColor, 0.2, 0.6, 0.9, 0.5);  // More transparent blue
-        gl.uniform1f(u_texColorWeight, 0.3);            // Less texture influence
-        gl.uniform2f(u_TexScale, 8.0, 8.0);            // Larger scale pattern
-        this.poolWater.render(gl, program, viewMatrix, projectionMatrix, 0.3);
-        gl.disable(gl.BLEND);
-        
-        // After water rendering, add pool wall rendering
+        // 6. Render pool WALLS (before water)
         for (const wall of this.poolWalls) {
-            gl.bindTexture(gl.TEXTURE_2D, this.textures.poolBottom); // Use pool bottom texture for walls
+            gl.bindTexture(gl.TEXTURE_2D, this.textures.poolBottom);
             gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
             gl.uniform1f(u_texColorWeight, 0.95);
-            gl.uniform2f(u_TexScale, 4.0, 4.0);   // 4x4 tiling for pool walls
+            gl.uniform2f(u_TexScale, 4.0, 4.0);
             wall.render(gl, program, viewMatrix, projectionMatrix, 0.95);
         }
         
-        // 5. Render all walls, ceiling, and other cubes
+        // 7. Render pool water (with transparency)
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.textures.water);
+
+        gl.uniform4f(u_baseColor, 0.2, 0.6, 0.9, 0.6);
+        gl.uniform1f(u_texColorWeight, 0.8);
+        gl.uniform2f(u_TexScale, 4.0, 4.0);
+
+        // Ensure poolWater exists before trying to render it
+        if (this.poolWater) {
+            this.poolWater.render(gl, program, viewMatrix, projectionMatrix, 0.8);
+        }
+        gl.disable(gl.BLEND);
+        
+        // 8. Render all walls, ceiling, and other cubes
         for (const cube of this.cubes) {
             // Select texture based on cube type
             if (cube.type === 'ceiling') {
