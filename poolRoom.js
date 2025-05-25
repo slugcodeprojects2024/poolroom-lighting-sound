@@ -21,17 +21,6 @@ class PoolRoom {
         // Initialize textures
         this.textures = {};
         
-        // Add block types array for different block materials
-        this.blockTypes = [
-            { name: 'Default', textureKey: 'wall' },      // Default - use wall texture
-            { name: 'Stone', textureKey: 'stone' },       // Stone block
-            { name: 'Wood', textureKey: 'wood' },         // Wood block
-            { name: 'Glass', textureKey: 'glass' }        // Glass block
-        ];
-        
-        // Track placed blocks for easy removal
-        this.placedBlocks = [];
-        
         // Create texture objects
         this.createTextures();
         
@@ -43,16 +32,16 @@ class PoolRoom {
         this.ground.setPosition(this.mapSize / 2 - 0.5, -0.05, this.mapSize / 2 - 0.5);
         this.ground.setScale(this.mapSize, 0.1, this.mapSize);
 
-        // Create pool water with DEEPER pool
+        // Create pool water with adjusted position
         this.poolWater = new Cube(gl);
-        this.poolWater.setPosition(this.mapSize / 2 - 0.5, 0.025, this.mapSize / 2 - 0.5);
+        this.poolWater.setPosition(this.mapSize / 2 - 0.5, -0.1, this.mapSize / 2 - 0.5); // Slightly lower
         this.poolWater.setScale(this.mapSize * 0.7, 0.05, this.mapSize * 0.7);
 
         // Create pool floor (much deeper)
         const poolSize = this.mapSize * 0.7;
         const poolStart = (this.mapSize - poolSize) / 2;
         this.poolFloor = new Cube(gl);
-        this.poolFloor.setPosition(this.mapSize / 2 - 0.5, -3.0, this.mapSize / 2 - 0.5); // Deeper pool floor
+        this.poolFloor.setPosition(this.mapSize / 2 - 0.5, -1.0, this.mapSize / 2 - 0.5);
         this.poolFloor.setScale(poolSize, 0.1, poolSize);
 
         // Create pool walls to show depth
@@ -63,8 +52,8 @@ class PoolRoom {
 
         // North wall
         const northWall = new Cube(gl);
-        northWall.setPosition(this.mapSize / 2 - 0.5, -wallDepth/2, poolStart);
-        northWall.setScale(poolSize, wallDepth, 0.1);
+        northWall.setPosition(this.mapSize / 2 - 0.5, -0.5, poolStart);
+        northWall.setScale(poolSize, 1.0, 0.1);
         northWall.type = 'poolWall';
         this.poolWalls.push(northWall);
 
@@ -193,7 +182,8 @@ class PoolRoom {
             skyboxCeiling: this.createPlaceholderTexture([135, 206, 250, 255]), // Sky blue for ceiling
             skyboxFloor: this.createPlaceholderTexture([200, 200, 230, 255]),    // Light gray-blue for floor
             skyboxWall: this.createPlaceholderTexture([120, 180, 255, 255]),     // Light blue for walls
-            pillar: this.createPlaceholderTexture([220, 220, 220, 255])    // Light gray for pillars
+            pillar: this.createPlaceholderTexture([220, 220, 220, 255]),    // Light gray for pillars
+            poolWall: this.createPlaceholderTexture([120, 180, 255, 255])    // Light blue for pool walls
         };
 
         // Add textures for different block types
@@ -224,6 +214,9 @@ class PoolRoom {
 
         // Create a water texture (procedural)
         this.createEnhancedWaterTexture();
+
+        // Add pool wall texture loading
+        this.loadTexture('poolWall', 'textures/stone_bricks.png');
     }
 
     // Create specialized skybox textures
@@ -779,138 +772,14 @@ class PoolRoom {
                 gl.disable(gl.BLEND);
             }
         }
-    }
-    
-    // Add a block at a position
-    addBlock(x, y, z, blockType = 0) {
-        // Validate coordinates
-        if (x < 0 || x >= this.mapSize || z < 0 || z >= this.mapSize || y < 0 || y >= this.maxHeight) {
-            console.log("Block position out of bounds:", x, y, z);
-            return false;
-        }
-        
-        // Validate block type
-        if (blockType < 0 || blockType >= this.blockTypes.length) {
-            console.log("Invalid block type:", blockType);
-            blockType = 0; // Default to first type if invalid
-        }
-        
-        // Update map
-        this.map[x][z] = Math.max(this.map[x][z], y + 1);
-        
-        // Create a new cube
-        const cube = new Cube(this.gl);
-        cube.setPosition(x, y + 0.5, z);
-        
-        // Make the block smaller - scale to 0.35 of original size
-        cube.setScale(0.35, 0.35, 0.35);
-        
-        // Set block type
-        cube.type = this.blockTypes[blockType].textureKey;
-        cube.blockType = blockType;
-        
-        // Add to cubes array
-        this.cubes.push(cube);
-        
-        // Store reference in placedBlocks array for tracking
-        this.placedBlocks.push({
-            cube: cube,
-            index: this.cubes.length - 1,
-            position: { x, y, z }
-        });
-        
-        console.log("Block added successfully:", cube.type);
-        return true;
-    }
-    
-    // Remove a block at a specific position
-    removeBlock(x, y, z) {
-        console.log("Attempting to remove block at:", x, y, z);
-        
-        // Find the cube at this position
-        for (let i = 0; i < this.cubes.length; i++) {
-            const cube = this.cubes[i];
-            const matrix = cube.modelMatrix.elements;
-            
-            // Check position with increased tolerance for scaled blocks
-            if (Math.abs(matrix[12] - x) < 0.5 && 
-                Math.abs(matrix[13] - (y + 0.5)) < 0.5 && 
-                Math.abs(matrix[14] - z) < 0.5) {
-                
-                console.log("Found matching block at index:", i);
-                
-                // Remove the cube
-                this.cubes.splice(i, 1);
-                
-                // Update placedBlocks array
-                for (let j = 0; j < this.placedBlocks.length; j++) {
-                    if (this.placedBlocks[j].cube === cube) {
-                        this.placedBlocks.splice(j, 1);
-                        break;
-                    }
-                }
-                
-                // Update the map
-                if (this.map[x][z] > y) {
-                    this.map[x][z] = y;
-                }
-                
-                console.log("Block removed successfully");
-                return true;
-            }
-        }
-        
-        console.log("No block found at position:", x, y, z);
-        return false;
-    }
 
-    // Remove the last placed block (for easier undo functionality)
-    removeLastBlock() {
-        // Check if there are any blocks to remove
-        if (this.placedBlocks.length === 0) {
-            console.log("No blocks to remove");
-            return false;
+        // Render pool walls
+        for (const wall of this.poolWalls) {
+            gl.bindTexture(gl.TEXTURE_2D, this.textures.poolWall);
+            gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
+            gl.uniform1f(u_texColorWeight, 0.95);
+            gl.uniform2f(u_TexScale, 4.0, 4.0);
+            wall.render(gl, program, viewMatrix, projectionMatrix, 0.95);
         }
-        
-        // Get the last placed block
-        const lastBlock = this.placedBlocks.pop();
-        
-        // Get its position
-        const pos = lastBlock.position;
-        
-        // Find its current index (may have changed if other blocks were removed)
-        let currentIndex = -1;
-        for (let i = 0; i < this.cubes.length; i++) {
-            if (this.cubes[i] === lastBlock.cube) {
-                currentIndex = i;
-                break;
-            }
-        }
-        
-        // If found, remove it
-        if (currentIndex !== -1) {
-            this.cubes.splice(currentIndex, 1);
-            
-            // Update the map if needed (only if it's the highest block at this position)
-            if (this.map[pos.x][pos.z] > pos.y) {
-                // Find the new highest block at this location
-                let newHeight = 0;
-                
-                // Check each placed block
-                for (const block of this.placedBlocks) {
-                    if (block.position.x === pos.x && block.position.z === pos.z) {
-                        newHeight = Math.max(newHeight, block.position.y + 1);
-                    }
-                }
-                
-                this.map[pos.x][pos.z] = newHeight;
-            }
-            
-            console.log("Removed last placed block at", pos);
-            return true;
-        }
-        
-        console.log("Failed to remove last block - not found in cubes array");
-        return false;
     }
 }

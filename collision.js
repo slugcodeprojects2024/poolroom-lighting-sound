@@ -97,74 +97,32 @@ class CollisionHandler {
         const poolSize = this.poolRoom.mapSize * 0.7;
         const poolStart = (this.poolRoom.mapSize - poolSize) / 2;
         
-        // Add water area definition with proper depth now
+        // Update water area definition
         this.waterAreas.push({
             minX: poolStart,
             maxX: poolStart + poolSize,
             minY: -1.0, // Bottom of water volume
-            maxY: -0.05, // Water surface is slightly below ground level
+            maxY: -0.05, // Slightly below ground level
             minZ: poolStart,
             maxZ: poolStart + poolSize
         });
         
-        // Add a SOLID pool floor with multiple layers to prevent falling through
-        // Pool bottom - make it thicker and overlap with water bottom slightly
+        // Add a SOLID pool floor
         this.collisionBoxes.push({
-            minX: poolStart - 0.5,  // Extend beyond pool edges
+            minX: poolStart - 0.5,  // Extend slightly beyond pool edges
             maxX: poolStart + poolSize + 0.5,
-            minY: -1.2, // Go below pool bottom
-            maxY: -0.9, // Extend slightly up into water
-            minZ: poolStart - 0.5,  // Extend beyond pool edges
+            minY: -1.2, // Bottom of collision volume
+            maxY: -0.9, // Slightly below water surface
+            minZ: poolStart - 0.5,
             maxZ: poolStart + poolSize + 0.5
         });
 
-        // Add a SOLID pool floor collision box
+        // Add a thin "landing" layer at the pool bottom for better collision detection
         this.collisionBoxes.push({
             minX: poolStart,
             maxX: poolStart + poolSize,
             minY: -1.0, // Exact pool bottom
-            maxY: -0.9, // Slightly above the pool bottom
-            minZ: poolStart,
-            maxZ: poolStart + poolSize
-        });
-
-        // Add a simple pool bottom collision box
-        this.collisionBoxes.push({
-            minX: poolStart,
-            maxX: poolStart + poolSize,
-            minY: -1.0, // Pool bottom
-            maxY: -0.9, // Slightly above the bottom
-            minZ: poolStart,
-            maxZ: poolStart + poolSize
-        });
-        console.log("Pool bottom collision box added:", this.collisionBoxes[this.collisionBoxes.length - 1]);
-
-        // Update the pool bottom collision box
-        this.collisionBoxes.push({
-            minX: poolStart,
-            maxX: poolStart + poolSize,
-            minY: -0.5, // Raise the pool bottom to -0.5
-            maxY: -0.4, // Slightly above the pool bottom
-            minZ: poolStart,
-            maxZ: poolStart + poolSize
-        });
-
-        // Update the pool bottom collision box to raise it higher
-        this.collisionBoxes.push({
-            minX: poolStart,
-            maxX: poolStart + poolSize,
-            minY: -0.3, // Raise the pool bottom to -0.3
-            maxY: -0.2, // Slightly above the pool bottom
-            minZ: poolStart,
-            maxZ: poolStart + poolSize
-        });
-
-        // Update the pool bottom collision box to raise it higher
-        this.collisionBoxes.push({
-            minX: poolStart,
-            maxX: poolStart + poolSize,
-            minY: -0.2, // Raise the pool bottom to -0.2
-            maxY: -0.1, // Slightly above the pool bottom
+            maxY: -0.95, // Very thin layer
             minZ: poolStart,
             maxZ: poolStart + poolSize
         });
@@ -321,11 +279,6 @@ class CollisionHandler {
         
         // Otherwise return floor level
         return 0.0;
-    }
-    
-    // Update collision objects when blocks are added/removed
-    updateCollisionObjects() {
-        this.initCollisionObjects();
     }
     
     // Check if position is above the pool area

@@ -215,34 +215,30 @@ class Camera {
     updateWaterPhysics(deltaTime) {
         if (!this.collisionHandler) return;
         
-        // Check if in water
         const isInWater = this.collisionHandler.isInWater(this.position.elements);
         
         if (isInWater) {
-            // Apply buoyancy - counteracts gravity when in water
-            const buoyancy = 1.8; // Adjust to control floating force
-            this.velocity.elements[1] += buoyancy * deltaTime;
+            // Reduce gravity effect in water
+            this.gravity = -2.0;
             
-            // Apply water resistance - slows movement in all directions
-            const waterResistance = 0.92;
-            this.velocity.elements[0] *= waterResistance;
-            this.velocity.elements[1] *= waterResistance; // Slower vertical movement in water
-            this.velocity.elements[2] *= waterResistance;
+            // Allow swimming up with space
+            if (keys[' ']) {
+                this.velocity.elements[1] = 3.0;
+            }
             
-            // Reduce jump force when in water
-            this.jumpVelocity = 0.8; // Lower jump in water
+            // Add water resistance
+            const resistance = 0.7;
+            this.velocity.elements[0] *= resistance;
+            this.velocity.elements[1] *= resistance;
+            this.velocity.elements[2] *= resistance;
             
-            // Reduce speed when in water
-            this.currentSpeed = this.baseSpeed * 0.6;
-            
-            // Add visual effects for water (if desired)
-            // e.g., screen overlay, sound effects, etc.
+            // Add buoyancy
+            if (this.velocity.elements[1] < 0) {
+                this.velocity.elements[1] *= 0.5;
+            }
         } else {
-            // Reset to normal physics when out of water
-            this.jumpVelocity = 1.5; // Normal jump height
-            
-            // Reset speed based on sprint state
-            this.currentSpeed = this.isSprinting ? (this.baseSpeed * this.sprintMultiplier) : this.baseSpeed;
+            // Reset gravity when out of water
+            this.gravity = -9.8;
         }
     }
     
@@ -302,101 +298,4 @@ class Camera {
     getStaminaPercentage() {
         return (this.stamina / this.staminaMax) * 100;
     }
-
-    // Cast a ray and find where it hits a block
-    getTargetBlock(distance = 5.0, resolution = 0.1) {
-        // Get camera position and direction
-        const cameraPos = this.position.elements;
-        const dir = new Vector3([
-            this.front.elements[0],
-            this.front.elements[1],
-            this.front.elements[2]
-        ]);
-        dir.normalize();
-        
-        // Ray marching to find intersection
-        let currentPoint = [cameraPos[0], cameraPos[1], cameraPos[2]];
-        let lastPoint = [...currentPoint]; // Copy initial position
-        
-        // Step along the ray
-        for (let d = 0; d <= distance; d += resolution) {
-            // Save last position before updating
-            lastPoint = [...currentPoint];
-            
-            // Calculate current position
-            currentPoint[0] = cameraPos[0] + dir.elements[0] * d;
-            currentPoint[1] = cameraPos[1] + dir.elements[1] * d;
-            currentPoint[2] = cameraPos[2] + dir.elements[2] * d;
-            
-            // Convert to grid coordinates
-            const gridX = Math.round(currentPoint[0]);
-            const gridY = Math.round(currentPoint[1]);
-            const gridZ = Math.round(currentPoint[2]);
-            
-            // Skip positions outside the valid range
-            if (gridX < 0 || gridX >= this.collisionHandler.poolRoom.mapSize ||
-                gridY < 0 || gridY >= this.collisionHandler.poolRoom.maxHeight ||
-                gridZ < 0 || gridZ >= this.collisionHandler.poolRoom.mapSize) {
-                continue;
-            }
-            
-            // Check if we're looking at an existing block/wall
-            if (this.checkBlockAt(gridX, gridY, gridZ)) {
-                // Convert last position to grid for placement
-                const placeX = Math.round(lastPoint[0]);
-                const placeY = Math.round(lastPoint[1]);
-                const placeZ = Math.round(lastPoint[2]);
-                
-                return {
-                    x: placeX,
-                    y: placeY,
-                    z: placeZ,
-                    hitBlock: { x: gridX, y: gridY, z: gridZ }
-                };
-            }
-        }
-        
-        // If no hit, return the end point of the ray
-        const endX = Math.round(currentPoint[0]);
-        const endY = Math.round(currentPoint[1]);
-        const endZ = Math.round(currentPoint[2]);
-        
-        return {
-            x: endX,
-            y: endY, 
-            z: endZ,
-            hitBlock: null
-        };
-    }
-
-    // Helper method to check if a block exists at a position
-    checkBlockAt(x, y, z) {
-        if (!this.collisionHandler) return false;
-        
-        // Check if this is a wall from the map
-        if (y < this.collisionHandler.poolRoom.map[x][z]) {
-            return true;
-        }
-        
-        // Check if there's a player-placed block here
-        for (const cube of this.collisionHandler.poolRoom.cubes) {
-            const matrix = cube.modelMatrix.elements;
-            
-            // Check position with tolerance for smaller blocks
-            if (Math.abs(matrix[12] - x) < 0.4 && 
-                Math.abs(matrix[13] - (y + 0.5)) < 0.4 && 
-                Math.abs(matrix[14] - z) < 0.4) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
 }
-
-// Add this method to CollisionHandler in collision.js:
-// filepath: c:\Users\15622\Desktop\UCSC Classes\CSE 160\asg3\collision.js
-
-// Check if block exists at specific coordinates
-// This should be added as a method inside the CollisionHandler class in collision.js, not here.
-// Remove this from camera.js to fix the error.

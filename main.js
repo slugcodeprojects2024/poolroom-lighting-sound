@@ -4,7 +4,6 @@ let program;
 let camera;
 let poolRoom;
 let collisionHandler;
-let blockIndicator;
 let lastTime = 0;
 let keys = {};
 let mouseX = 0, mouseY = 0;
@@ -48,9 +47,6 @@ function init() {
     collisionHandler = new CollisionHandler(poolRoom);
     camera.setCollisionHandler(collisionHandler);
     
-    // Create block indicator
-    blockIndicator = new BlockIndicator(gl);
-    
     // Set up event listeners
     setupEventListeners(canvas);
     
@@ -91,39 +87,6 @@ function setupEventListeners(canvas) {
         // Toggle collision with 'C' key
         if (event.key === 'c' || event.key === 'C') {
             collisionHandler.toggleCollision();
-        }
-        
-        // Cycle block types with 'B' key
-        if (event.key === 'b' || event.key === 'B') {
-            if (blockIndicator) {
-                blockIndicator.cycleBlockType();
-            }
-        }
-        
-        // Add "F" key to place blocks as an alternative
-        if (event.key === 'f' || event.key === 'F') {
-            console.log("F key pressed - placing block");
-            const pos = camera.getTargetBlock(5.0, 0.1);
-            const blockType = blockIndicator.getCurrentBlockType();
-            const success = poolRoom.addBlock(pos.x, pos.y, pos.z, blockType);
-            
-            if (success) {
-                collisionHandler.updateCollisionObjects();
-                showNotification(`Block placed: ${blockIndicator.blockTypeNames[blockType]}`, 1000);
-            }
-        }
-        
-        // Add "G" key to remove the last block as an alternative
-        if (event.key === 'g' || event.key === 'G') {
-            console.log("G key pressed - removing block");
-            const success = poolRoom.removeLastBlock();
-            
-            if (success) {
-                collisionHandler.updateCollisionObjects();
-                showNotification('Last block removed', 1000);
-            } else {
-                showNotification('No blocks to remove', 1000);
-            }
         }
     });
     
@@ -312,18 +275,45 @@ function render() {
     // Update physics (gravity, stamina, etc.)
     camera.updatePhysics(deltaTime);
     
-    // Clear the canvas
-    gl.clearColor(0.1, 0.1, 0.1, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // Near the start of render function
+    const isUnderwater = camera.collisionHandler.isInWater(camera.position.elements);
     
-    // Update block indicator position
-    blockIndicator.update(camera);
+    if (isUnderwater) {
+        // Blue tint for underwater
+        gl.clearColor(0.0, 0.2, 0.4, 1.0); // Darker blue
+        
+        // Enable fog for underwater effect
+        const u_FogColor = gl.getUniformLocation(program, 'u_FogColor');
+        const u_FogNear = gl.getUniformLocation(program, 'u_FogNear');
+        const u_FogFar = gl.getUniformLocation(program, 'u_FogFar');
+        
+        gl.uniform3f(u_FogColor, 0.0, 0.2, 0.4);
+        gl.uniform1f(u_FogNear, 0.1);
+        gl.uniform1f(u_FogFar, 20.0);
+        
+        // Update projection for underwater view
+        camera.projectionMatrix.setPerspective(
+            camera.fov * 0.8, // Reduced FOV underwater
+            gl.canvas.width / gl.canvas.height,
+            0.1,
+            20.0
+        );
+    } else {
+        // Normal rendering
+        gl.clearColor(0.9, 0.9, 0.9, 1.0);
+        camera.projectionMatrix.setPerspective(
+            camera.zoom,
+            canvas.width / canvas.height,
+            0.1,
+            100.0 // normal far plane
+        );
+    }
+    
+    // Clear the canvas
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
     // Render the poolroom
     poolRoom.render(gl, program, camera);
-    
-    // Render the block indicator
-    blockIndicator.render(gl, program, camera.viewMatrix, camera.projectionMatrix);
     
     // Display status information
     updateStatusDisplay();
@@ -344,8 +334,7 @@ function updateStatusDisplay() {
         
         let statusText = `Controls: WASD - Move | Mouse - Look | Q/E - Rotate<br>`;
         statusText += `Space - Jump | Shift - Sprint | C - Toggle Collision<br>`;
-        statusText += `Left Click/F - Place Block | Right Click/G - Remove Block<br>`; // Updated controls
-        statusText += `B - Cycle Block Types | Collision: ${collisionEnabled ? 'ON' : 'OFF'} | FPS: ${fps}`; // Added FPS counter
+        statusText += `Collision: ${collisionEnabled ? 'ON' : 'OFF'} | FPS: ${fps}`;
         
         if (camera.isSprinting) {
             statusText += ` | SPRINTING`;
