@@ -8,6 +8,7 @@ let lastTime = 0;
 let keys = {};
 let mouseX = 0, mouseY = 0;
 let mouseDown = false;
+let canvas;
 
 // Add these variables at the top with your other global variables
 let frameCount = 0;
@@ -17,7 +18,7 @@ let fps = 0;
 // Initialize WebGL context
 function init() {
     // Get the canvas element
-    const canvas = document.getElementById('webgl');
+    canvas = document.getElementById('webgl');
     
     // Get the WebGL context
     gl = canvas.getContext('webgl');
@@ -257,13 +258,13 @@ function processInput(deltaTime) {
 function render() {
     // Calculate delta time
     const currentTime = performance.now();
-    const deltaTime = (currentTime - lastTime) / 1000.0; // Convert to seconds
+    const deltaTime = (currentTime - lastTime) / 1000.0;
     lastTime = currentTime;
     
     // FPS calculation
     frameCount++;
     fpsTime += deltaTime;
-    if (fpsTime >= 1.0) { // Update FPS every second
+    if (fpsTime >= 1.0) {
         fps = Math.round(frameCount / fpsTime);
         frameCount = 0;
         fpsTime = 0;
@@ -272,41 +273,16 @@ function render() {
     // Process keyboard input
     processInput(deltaTime);
     
-    // Update physics (gravity, stamina, etc.)
+    // Update physics
     camera.updatePhysics(deltaTime);
     
-    // Near the start of render function
+    // Check if underwater
     const isUnderwater = camera.collisionHandler.isInWater(camera.position.elements);
     
     if (isUnderwater) {
-        // Blue tint for underwater
-        gl.clearColor(0.0, 0.2, 0.4, 1.0); // Darker blue
-        
-        // Enable fog for underwater effect
-        const u_FogColor = gl.getUniformLocation(program, 'u_FogColor');
-        const u_FogNear = gl.getUniformLocation(program, 'u_FogNear');
-        const u_FogFar = gl.getUniformLocation(program, 'u_FogFar');
-        
-        gl.uniform3f(u_FogColor, 0.0, 0.2, 0.4);
-        gl.uniform1f(u_FogNear, 0.1);
-        gl.uniform1f(u_FogFar, 20.0);
-        
-        // Update projection for underwater view
-        camera.projectionMatrix.setPerspective(
-            camera.fov * 0.8, // Reduced FOV underwater
-            gl.canvas.width / gl.canvas.height,
-            0.1,
-            20.0
-        );
+        gl.clearColor(0.0, 0.2, 0.4, 1.0);
     } else {
-        // Normal rendering
         gl.clearColor(0.9, 0.9, 0.9, 1.0);
-        camera.projectionMatrix.setPerspective(
-            camera.zoom,
-            canvas.width / canvas.height,
-            0.1,
-            100.0 // normal far plane
-        );
     }
     
     // Clear the canvas
@@ -315,55 +291,11 @@ function render() {
     // Render the poolroom
     poolRoom.render(gl, program, camera);
     
-    // Display status information
-    updateStatusDisplay();
+    // Update status display
+    const statusText = `FPS: ${fps} | Collision: ${collisionHandler.collisionEnabled ? 'ON' : 'OFF'}`;
+    document.getElementById('status').innerHTML = statusText;
     
-    // Update FPS counter
-    updateFpsCounter();
-    
-    // Request next frame
     requestAnimationFrame(render);
-}
-
-// Update the status display
-function updateStatusDisplay() {
-    const statusDiv = document.getElementById('status');
-    if (statusDiv) {
-        const stamina = Math.round(camera.getStaminaPercentage());
-        const collisionEnabled = collisionHandler ? collisionHandler.enabled : true;
-        
-        let statusText = `Controls: WASD - Move | Mouse - Look | Q/E - Rotate<br>`;
-        statusText += `Space - Jump | Shift - Sprint | C - Toggle Collision<br>`;
-        statusText += `Collision: ${collisionEnabled ? 'ON' : 'OFF'} | FPS: ${fps}`;
-        
-        if (camera.isSprinting) {
-            statusText += ` | SPRINTING`;
-        }
-        
-        statusDiv.innerHTML = statusText;
-    }
-    
-    // Update stamina bar
-    if (typeof updateStaminaBar === 'function') {
-        updateStaminaBar(camera.getStaminaPercentage());
-    }
-}
-
-// Add this function to update the FPS counter
-function updateFpsCounter() {
-    const fpsElement = document.getElementById('fps-counter');
-    if (fpsElement) {
-        fpsElement.textContent = `FPS: ${fps}`;
-        
-        // Colorize based on performance
-        if (fps >= 45) {
-            fpsElement.style.color = '#00ff00'; // Good - green
-        } else if (fps >= 30) {
-            fpsElement.style.color = '#ffff00'; // OK - yellow
-        } else {
-            fpsElement.style.color = '#ff0000'; // Bad - red
-        }
-    }
 }
 
 // Start the application when the page loads

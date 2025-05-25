@@ -8,6 +8,26 @@ class CollisionHandler {
         this.waterAreas = [];
         this.enabled = true; // Collision detection starts enabled
         
+        // Add pool walls to collision objects
+        this.poolWalls = [];
+        if (poolRoom && poolRoom.poolWalls) {
+            for (const wall of poolRoom.poolWalls) {
+                if (wall.position && wall.scale) {  // Check if properties exist
+                    const pos = wall.position.elements || wall.position;  // Handle both array and Vector3 cases
+                    const scale = wall.scale.elements || wall.scale;
+                    
+                    this.poolWalls.push({
+                        minX: pos[0] - scale[0]/2,
+                        maxX: pos[0] + scale[0]/2,
+                        minY: pos[1] - scale[1]/2,
+                        maxY: pos[1] + scale[1]/2,
+                        minZ: pos[2] - scale[2]/2,
+                        maxZ: pos[2] + scale[2]/2
+                    });
+                }
+            }
+        }
+        
         // Initialize collision objects if poolRoom is provided
         if (poolRoom) {
             this.initCollisionObjects();
@@ -144,6 +164,18 @@ class CollisionHandler {
         
         // Create a copy of the position to modify
         let newPosition = [position[0], position[1], position[2]];
+        
+        // Check pool wall collisions first
+        for (const wall of this.poolWalls) {
+            if (newPosition[0] + radius > wall.minX && 
+                newPosition[0] - radius < wall.maxX &&
+                newPosition[1] + radius > wall.minY && 
+                newPosition[1] - radius < wall.maxY &&
+                newPosition[2] + radius > wall.minZ && 
+                newPosition[2] - radius < wall.maxZ) {
+                return previousPosition;
+            }
+        }
         
         // CRITICAL FIX: First check if we're below the pool bottom
         // If we're in the pool area and below -1.1, teleport immediately back up

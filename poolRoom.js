@@ -216,7 +216,7 @@ class PoolRoom {
         this.createEnhancedWaterTexture();
 
         // Add pool wall texture loading
-        this.loadTexture('poolWall', 'textures/stone_bricks.png');
+        this.loadTextureFromFile('textures/stone_bricks.png', 'poolWall');
     }
 
     // Create specialized skybox textures
@@ -708,11 +708,20 @@ class PoolRoom {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.bindTexture(gl.TEXTURE_2D, this.textures.water);
-        gl.uniform4f(u_baseColor, 0.0, 0.7, 0.95, 0.7);  // Bright blue with transparency
-        gl.uniform1f(u_texColorWeight, 0.7);             // Increased texture influence
-        gl.uniform2f(u_TexScale, 2.0, 2.0);              // 2x2 tiling for more visible water pattern
-        this.poolWater.render(gl, program, viewMatrix, projectionMatrix, 0.7);
+        gl.uniform4f(u_baseColor, 0.2, 0.6, 0.9, 0.5);  // More transparent blue
+        gl.uniform1f(u_texColorWeight, 0.3);            // Less texture influence
+        gl.uniform2f(u_TexScale, 8.0, 8.0);            // Larger scale pattern
+        this.poolWater.render(gl, program, viewMatrix, projectionMatrix, 0.3);
         gl.disable(gl.BLEND);
+        
+        // After water rendering, add pool wall rendering
+        for (const wall of this.poolWalls) {
+            gl.bindTexture(gl.TEXTURE_2D, this.textures.poolBottom); // Use pool bottom texture for walls
+            gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
+            gl.uniform1f(u_texColorWeight, 0.95);
+            gl.uniform2f(u_TexScale, 4.0, 4.0);   // 4x4 tiling for pool walls
+            wall.render(gl, program, viewMatrix, projectionMatrix, 0.95);
+        }
         
         // 5. Render all walls, ceiling, and other cubes
         for (const cube of this.cubes) {
@@ -771,15 +780,6 @@ class PoolRoom {
             if (cube.type === 'glass') {
                 gl.disable(gl.BLEND);
             }
-        }
-
-        // Render pool walls
-        for (const wall of this.poolWalls) {
-            gl.bindTexture(gl.TEXTURE_2D, this.textures.poolWall);
-            gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
-            gl.uniform1f(u_texColorWeight, 0.95);
-            gl.uniform2f(u_TexScale, 4.0, 4.0);
-            wall.render(gl, program, viewMatrix, projectionMatrix, 0.95);
         }
     }
 }
