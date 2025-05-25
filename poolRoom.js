@@ -96,7 +96,7 @@ export class PoolRoom {
             // Ladder is on the min-X side of the (hx, hz) cell
             const ladderCenterX = hx - 0.5 + ladderThickness / 2;
             const ladderCenterZ = hz;
-            for (let y = 0; y < this.maxHeight; y++) { 
+            for (let y = 0; y <= this.maxHeight; y++) {
                 const ladderCube = new Cube(this.gl);
                 ladderCube.setPosition(ladderCenterX, y + 0.5, ladderCenterZ);
                 ladderCube.setScale(ladderThickness, 1, 1); // Thin in X, full size in Y and Z
@@ -119,7 +119,7 @@ export class PoolRoom {
             // Ladder is on the max-X side of the (hx, hz) cell
             const ladderCenterX = hx + 1.5 - ladderThickness / 2;
             const ladderCenterZ = hz;
-            for (let y = 0; y < this.maxHeight; y++) {
+            for (let y = 0; y <= this.maxHeight; y++) {
                 const ladderCube = new Cube(this.gl);
                 ladderCube.setPosition(ladderCenterX, y + 0.5, ladderCenterZ);
                 ladderCube.setScale(ladderThickness, 1, 1); // Thin in X
@@ -142,7 +142,7 @@ export class PoolRoom {
             // Ladder is on the min-X side of the (hx, hz) cell
             const ladderCenterX = hx - 0.5 + ladderThickness / 2;
             const ladderCenterZ = hz;
-            for (let y = 0; y < this.maxHeight; y++) {
+            for (let y = 0; y <= this.maxHeight; y++) {
                 const ladderCube = new Cube(this.gl);
                 ladderCube.setPosition(ladderCenterX, y + 0.5, ladderCenterZ);
                 ladderCube.setScale(ladderThickness, 1, 1); // Thin in X
@@ -165,7 +165,7 @@ export class PoolRoom {
             // Ladder is on the max-X side of the (hx, hz) cell
             const ladderCenterX = hx + 1.5 - ladderThickness / 2;
             const ladderCenterZ = hz;
-            for (let y = 0; y < this.maxHeight; y++) {
+            for (let y = 0; y <= this.maxHeight; y++) {
                 const ladderCube = new Cube(this.gl);
                 ladderCube.setPosition(ladderCenterX, y + 0.5, ladderCenterZ);
                 ladderCube.setScale(ladderThickness, 1, 1); // Thin in X
@@ -245,7 +245,7 @@ export class PoolRoom {
             skyboxWall: this.createPlaceholderTexture([120, 180, 255, 255]),
             pillar: this.createPlaceholderTexture([220, 220, 220, 255]),
             poolWall: this.createPlaceholderTexture([120, 180, 255, 255]),
-            ladder: this.createPlaceholderTexture([100, 70, 30, 255]), // Brown placeholder for ladder
+            ladder: this.createPlaceholderTexture([100, 70, 30, 255], "ladder"),
         };
 
         // Add textures for different block types
@@ -278,24 +278,45 @@ export class PoolRoom {
     }
 
     // Create placeholder texture with a specific color
-    createPlaceholderTexture(color) {
+    createPlaceholderTexture(color, type = "") {
+        const size = 64; // Texture size (power of two)
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // Fill background
+        ctx.fillStyle = `rgba(${color[0]},${color[1]},${color[2]},${color[3] / 255})`;
+        ctx.fillRect(0, 0, size, size);
+
+        if (type === "ladder") {
+            // Draw ladder rails
+            ctx.fillStyle = "#5a3a1a"; // Darker brown for rails
+            const railWidth = size * 0.15;
+            ctx.fillRect(size * 0.15, 0, railWidth, size); // Left rail
+            ctx.fillRect(size * 0.7, 0, railWidth, size);  // Right rail
+
+            // Draw ladder rungs
+            ctx.fillStyle = "#a67c52"; // Lighter brown for rungs
+            const rungHeight = size * 0.08;
+            for (let i = 1; i < 7; i++) {
+                const y = i * size / 7;
+                ctx.fillRect(size * 0.18, y, size * 0.64, rungHeight);
+            }
+        }
+
+        // ... existing code to create WebGL texture from canvas ...
+        // (You likely already have this part)
+        // Example:
         const gl = this.gl;
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        
-        const pixels = new Uint8Array([
-            color[0], color[1], color[2], color[3],
-            color[0], color[1], color[2], color[3],
-            color[0], color[1], color[2], color[3],
-            color[0], color[1], color[2], color[3]
-        ]);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-        
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-        
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
         return texture;
     }
 
@@ -719,3 +740,9 @@ export class PoolRoom {
         }
     }
 }
+
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'ControlLeft') {
+        camera.toggleLadderGrab();
+    }
+});

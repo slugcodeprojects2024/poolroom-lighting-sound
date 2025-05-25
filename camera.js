@@ -44,6 +44,12 @@ export class Camera {
         
         // Update matrices
         this.updateCameraVectors();
+        
+        this.isOnLadder = false;
+        this.climbSpeed = 3.0; // Adjust this value to change climbing speed
+        
+        this.isGrabbingLadder = false; // True when player is holding the ladder
+        this.ladderDirection = 0;      // 1 for up, -1 for down, 0 for idle
     }
     
     // Set collision handler
@@ -299,5 +305,71 @@ export class Camera {
     // Get stamina percentage for UI display
     getStaminaPercentage() {
         return (this.stamina / this.staminaMax) * 100;
+    }
+    
+    // Add this method to check if we're on a ladder
+    checkLadder() {
+        if (!this.collisionHandler || !this.collisionHandler.poolRoom) return false;
+        
+        const ladder = this.collisionHandler.poolRoom.getLadderAt(
+            this.position.elements,
+            [0.6, 1.8, 0.6] // player dimensions [width, height, depth]
+        );
+        
+        this.isOnLadder = ladder !== null;
+        return this.isOnLadder;
+    }
+    
+    // Modify the update method to handle ladder climbing
+    update(deltaTime, keys) {
+        // ... existing movement code ...
+
+        // Check if we're on a ladder
+        this.checkLadder();
+        
+        if (this.isGrabbingLadder) {
+            // Only allow up/down movement
+            if (keys['KeyW'] || keys['ArrowUp']) {
+                this.ladderDirection = 1;
+            } else if (keys['KeyS'] || keys['ArrowDown']) {
+                this.ladderDirection = -1;
+            } else {
+                this.ladderDirection = 0;
+            }
+
+            // Move up/down the ladder
+            this.velocity.elements[0] = 0;
+            this.velocity.elements[2] = 0;
+            this.velocity.elements[1] = this.ladderDirection * this.climbSpeed;
+
+            // Check for top/bottom of ladder (simple version: stop at ground or ceiling)
+            // You may want to use ladder cube bounds for more accuracy
+            if (this.position.elements[1] <= 0.0) { // ground
+                this.position.elements[1] = 0.0;
+                this.velocity.elements[1] = 0;
+            }
+            if (this.position.elements[1] >= this.maxHeight + 0.5) { // ceiling
+                this.position.elements[1] = this.maxHeight + 0.5;
+                this.velocity.elements[1] = 0;
+            }
+        } else if (this.isOnLadder) {
+            // Not grabbing, but on ladder: normal gravity applies
+            this.gravity = -9.8;
+        }
+        
+        // ... rest of existing update code ...
+    }
+
+    toggleLadderGrab() {
+        // Only allow grabbing if near a ladder
+        if (this.isOnLadder && !this.isGrabbingLadder) {
+            this.isGrabbingLadder = true;
+            this.ladderDirection = 0;
+            this.velocity.elements[0] = 0;
+            this.velocity.elements[2] = 0;
+        } else if (this.isGrabbingLadder) {
+            this.isGrabbingLadder = false;
+            this.ladderDirection = 0;
+        }
     }
 }

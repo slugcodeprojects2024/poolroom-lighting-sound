@@ -29,6 +29,22 @@ export class Player {
         this.mouseSensitivity = 0.002;
 
         this._initMouseLook();
+
+        this.isGrabbingLadder = false;
+        
+        // Add click handler
+        document.addEventListener('click', () => {
+            const potentialLadder = this.poolRoom.getLadderAt(this.position.elements, this.dimensions);
+            if (potentialLadder) {
+                this.isGrabbingLadder = !this.isGrabbingLadder;
+                if (this.isGrabbingLadder) {
+                    // Snap to ladder position when grabbing
+                    const ladderMatrix = potentialLadder.modelMatrix.elements;
+                    this.position.elements[0] = ladderMatrix[12];
+                    this.position.elements[2] = ladderMatrix[14];
+                }
+            }
+        });
     }
 
     _initMouseLook() {
@@ -48,31 +64,22 @@ export class Player {
         
         let potentialLadder = this.poolRoom.getLadderAt(this.position.elements, this.dimensions);
 
-        if (potentialLadder) {
-            console.log("Ladder detected at:", potentialLadder.modelMatrix.elements);
-            this.onGround = false; // Not on ground when on ladder
-            this.velocity.elements[1] = 0; // Stop vertical movement due to gravity
+        if (this.isGrabbingLadder && potentialLadder) {
+            this.onGround = false;
+            this.velocity.elements[1] = 0;
 
-            if (this.inputManager.isClimbingUp()) {
-                this.isClimbing = true;
+            if (this.inputManager.isKeyPressed('KeyW') || this.inputManager.isKeyPressed('ArrowUp')) {
                 this.position.elements[1] += this.climbSpeed * deltaTime;
-            } else if (this.inputManager.isClimbingDown()) {
-                this.isClimbing = true;
+            } else if (this.inputManager.isKeyPressed('KeyS') || this.inputManager.isKeyPressed('ArrowDown')) {
                 this.position.elements[1] -= this.climbSpeed * deltaTime;
-            } else {
-                this.isClimbing = true; // Stay in climbing mode, but don't move
             }
             
-            // Optional: Add slight magnetic effect to keep player centered on ladder
+            // Keep player centered on ladder
             const ladderMatrix = potentialLadder.modelMatrix.elements;
-            const ladderCenterX = ladderMatrix[12];
-            const ladderCenterZ = ladderMatrix[14];
-            
-            // Smooth interpolation towards ladder center
-            this.position.elements[0] = this.position.elements[0] * 0.8 + ladderCenterX * 0.2;
-            this.position.elements[2] = this.position.elements[2] * 0.8 + ladderCenterZ * 0.2;
+            this.position.elements[0] = ladderMatrix[12];
+            this.position.elements[2] = ladderMatrix[14];
         } else {
-            this.isClimbing = false;
+            this.isGrabbingLadder = false;
             
             // Apply gravity
             this.velocity.elements[1] += this.gravity * deltaTime;
