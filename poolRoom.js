@@ -63,6 +63,67 @@ export class PoolRoom {
         
         // Build the world objects
         this.buildWorld();
+
+        // Add a solid tower base underneath the poolroom
+        const ledgeWidth = 2; // How far the ledge/balcony extends
+        const towerBaseHeight = 40;
+        const y = -towerBaseHeight / 2; // So the top is at y=0
+
+        // North ledge (along the north wall)
+        const northLedge = new Cube(this.gl);
+        northLedge.setPosition(
+            this.mapSize / 2 - 0.5,
+            y,
+            -ledgeWidth / 2
+        );
+        northLedge.setScale(
+            this.mapSize + 2 * ledgeWidth, // Full width, including ledge on both sides
+            towerBaseHeight,
+            ledgeWidth
+        );
+        this.cubes.push(northLedge);
+
+        // South ledge (along the south wall)
+        const southLedge = new Cube(this.gl);
+        southLedge.setPosition(
+            this.mapSize / 2 - 0.5,
+            y,
+            this.mapSize - 0.5 + ledgeWidth / 2
+        );
+        southLedge.setScale(
+            this.mapSize + 2 * ledgeWidth,
+            towerBaseHeight,
+            ledgeWidth
+        );
+        this.cubes.push(southLedge);
+
+        // West ledge (along the west wall)
+        const westLedge = new Cube(this.gl);
+        westLedge.setPosition(
+            -ledgeWidth / 2,
+            y,
+            this.mapSize / 2 - 0.5
+        );
+        westLedge.setScale(
+            ledgeWidth,
+            towerBaseHeight,
+            this.mapSize
+        );
+        this.cubes.push(westLedge);
+
+        // East ledge (along the east wall)
+        const eastLedge = new Cube(this.gl);
+        eastLedge.setPosition(
+            this.mapSize - 0.5 + ledgeWidth / 2,
+            y,
+            this.mapSize / 2 - 0.5
+        );
+        eastLedge.setScale(
+            ledgeWidth,
+            towerBaseHeight,
+            this.mapSize
+        );
+        this.cubes.push(eastLedge);
     }
     
     // Create the poolroom layout
@@ -727,6 +788,12 @@ export class PoolRoom {
                 gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0); // Use full texture color
                 gl.uniform1f(u_texColorWeight, 1.0);
                 gl.uniform2f(u_TexScale, 1.0, 1.0); // Texture repeats on each 1x1 cube segment
+            }
+            else if (cube.type === 'towerBase') {
+                gl.bindTexture(gl.TEXTURE_2D, this.textures.wall); // Or a special texture if you want
+                gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
+                gl.uniform1f(u_texColorWeight, 1.0);
+                gl.uniform2f(u_TexScale, 4.0, this.towerBaseHeight / 4);
             }
             else {
                 // Default texture handling (likely for 'floor' blocks from map data)

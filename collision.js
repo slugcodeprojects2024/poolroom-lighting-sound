@@ -86,53 +86,6 @@ export class CollisionHandler {
             }
         }
         
-        // Add invisible barriers for window openings
-        for (let x = 0; x < this.poolRoom.mapSize; x++) {
-            for (let z = 0; z < this.poolRoom.mapSize; z++) {
-                const height = this.poolRoom.map[x][z];
-                
-                if (height === 0 && 
-                    (x === 0 || x === this.poolRoom.mapSize - 1 || 
-                     z === 0 || z === this.poolRoom.mapSize - 1)) {
-                    
-                    // Create a thin invisible barrier only at the actual opening
-                    // Adjust the barrier position based on which wall it's on
-                    let barrier = {
-                        minY: 0,
-                        maxY: 1.2, // Barrier height
-                    };
-                    
-                    if (x === 0) {
-                        // West wall - barrier pushed far outside
-                        barrier.minX = -0.50; // Half a unit outside the room
-                        barrier.maxX = -0.45; // Very thin barrier
-                        barrier.minZ = z - 0.5;
-                        barrier.maxZ = z + 0.5;
-                    } else if (x === this.poolRoom.mapSize - 1) {
-                        // East wall - barrier pushed far outside
-                        barrier.minX = x + 0.95; // Almost a full unit beyond the edge
-                        barrier.maxX = x + 1.0;  // Very thin barrier
-                        barrier.minZ = z - 0.5;
-                        barrier.maxZ = z + 0.5;
-                    } else if (z === 0) {
-                        // North wall - barrier pushed far outside
-                        barrier.minX = x - 0.5;
-                        barrier.maxX = x + 0.5;
-                        barrier.minZ = -0.50; // Half a unit outside the room
-                        barrier.maxZ = -0.45; // Very thin barrier
-                    } else if (z === this.poolRoom.mapSize - 1) {
-                        // South wall - barrier pushed far outside
-                        barrier.minX = x - 0.5;
-                        barrier.maxX = x + 0.5;
-                        barrier.minZ = z + 0.95; // Almost a full unit beyond the edge
-                        barrier.maxZ = z + 1.0;  // Very thin barrier
-                    }
-                    
-                    this.collisionBoxes.push(barrier);
-                }
-            }
-        }
-        
         // Add pool water collision area
         // Pool is in the center, 70% of map size
         const poolSize = this.poolRoom.mapSize * 0.7;
@@ -177,6 +130,49 @@ export class CollisionHandler {
             minZ: 0,  // Cover the entire map
             maxZ: this.poolRoom.mapSize
         });
+
+        // Add invisible railings around the balcony edge
+        const balconyWidth = 1.5;
+        const balconyThickness = 0.4;
+        const balconyHeight = 2.0;
+        const y = 0;
+
+        // North edge (along z)
+        this.collisionBoxes.push({
+            minX: -balconyWidth,
+            maxX: this.poolRoom.mapSize + balconyWidth,
+            minY: y,
+            maxY: y + balconyHeight,
+            minZ: -balconyWidth - balconyThickness,
+            maxZ: -balconyWidth
+        });
+        // South edge
+        this.collisionBoxes.push({
+            minX: -balconyWidth,
+            maxX: this.poolRoom.mapSize + balconyWidth,
+            minY: y,
+            maxY: y + balconyHeight,
+            minZ: this.poolRoom.mapSize + balconyWidth,
+            maxZ: this.poolRoom.mapSize + balconyWidth + balconyThickness
+        });
+        // West edge (along x)
+        this.collisionBoxes.push({
+            minX: -balconyWidth - balconyThickness,
+            maxX: -balconyWidth,
+            minY: y,
+            maxY: y + balconyHeight,
+            minZ: -balconyWidth,
+            maxZ: this.poolRoom.mapSize + balconyWidth
+        });
+        // East edge
+        this.collisionBoxes.push({
+            minX: this.poolRoom.mapSize + balconyWidth,
+            maxX: this.poolRoom.mapSize + balconyWidth + balconyThickness,
+            minY: y,
+            maxY: y + balconyHeight,
+            minZ: -balconyWidth,
+            maxZ: this.poolRoom.mapSize + balconyWidth
+        });
     }
     
     // Check collision with walls - returns adjusted position
@@ -188,6 +184,9 @@ export class CollisionHandler {
         
         // Check pool wall collisions first
         for (const wall of this.poolWalls) {
+            // If this wall has a window opening at this position, skip collision
+            if (this.isWindowOpening(newPosition, wall)) continue;
+
             if (newPosition[0] + radius > wall.minX && 
                 newPosition[0] - radius < wall.maxX &&
                 newPosition[1] + radius > wall.minY && 
@@ -212,15 +211,16 @@ export class CollisionHandler {
             return newPosition;
         }
         
-        // Continue with the rest of the collision checks
-        // Special window edge check - prevent falling through window
+        // Allow walking onto the balcony by expanding the world bounds
+        const balconyExtension = 2.0; // adjust as needed
+
         const isOutsideWorld = (
-            newPosition[0] < -0.45 || 
-            newPosition[0] > this.poolRoom.mapSize - 0.55 ||
-            newPosition[2] < -0.45 || 
-            newPosition[2] > this.poolRoom.mapSize - 0.55
+            newPosition[0] < -balconyExtension ||
+            newPosition[0] > this.poolRoom.mapSize - 1 + balconyExtension ||
+            newPosition[2] < -balconyExtension ||
+            newPosition[2] > this.poolRoom.mapSize - 1 + balconyExtension
         );
-        
+
         if (isOutsideWorld) {
             console.log('Preventing falling outside world');
             return previousPosition;
@@ -328,6 +328,18 @@ export class CollisionHandler {
                 return true;
             }
         }
+        return false;
+    }
+
+    isWindowOpening(position, wall) {
+        const [x, y, z] = position;
+        // Example: north wall window
+        if (wall.minZ === 0) {
+            if (x > 10 && x < 22 && y > 0.5 && y < 2.5 && Math.abs(z - wall.minZ) < 0.2) {
+                return true;
+            }
+        }
+        // Add more checks for other windows as needed
         return false;
     }
 }
