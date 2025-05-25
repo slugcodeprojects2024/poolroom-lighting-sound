@@ -1,6 +1,6 @@
 // cube.js - Cube class for creating and rendering cubes
 
-class Cube {
+export class Cube {
     constructor(gl) {
         this.gl = gl;
         this.vertexBuffer = null;

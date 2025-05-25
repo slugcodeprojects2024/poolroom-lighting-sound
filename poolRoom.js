@@ -1,11 +1,14 @@
+import { Cube } from './cube.js';
+
 // poolRoom.js - Fixed version with proper geometry alignment
-class PoolRoom {
+export class PoolRoom {
     constructor(gl) {
         this.gl = gl;
         this.mapSize = 32;
         this.maxHeight = 4;
         this.map = [];
         this.cubes = [];
+        this.cornerHoleDetails = []; // Initialize array for corner hole details
         
         // Define poolSize as a class property
         this.poolSize = this.mapSize * 0.7;
@@ -71,6 +74,103 @@ class PoolRoom {
                 if (x === 0 || x === this.mapSize - 1 || z === 0 || z === this.mapSize - 1) {
                     this.map[x][z] = this.maxHeight; // Full height walls
                 }
+                // Interior cells remain 0 (initialized in constructor)
+            }
+        }
+        
+        // Create corner holes and add ladders
+        const holeSize = 2; // 2x2 opening
+        const ladderThickness = 0.1; // How thin the ladder is
+
+        // Corner 1: Top-Left (near x=0, z=0)
+        let hx = 1; // X-coordinate of the 1x1 cell where the ladder base is
+        let hz = 1; // Z-coordinate of the 1x1 cell where the ladder base is
+        if (hx + holeSize <= this.mapSize && hz + holeSize <= this.mapSize) {
+            this.cornerHoleDetails.push({ x: hx, z: hz, size: holeSize });
+            for (let i = 0; i < holeSize; i++) {
+                for (let j = 0; j < holeSize; j++) {
+                    this.map[hx + i][hz + j] = 0; // Clear area for hole
+                }
+            }
+            // Add ladder for Corner 1
+            // Ladder is on the min-X side of the (hx, hz) cell
+            const ladderCenterX = hx - 0.5 + ladderThickness / 2;
+            const ladderCenterZ = hz;
+            for (let y = 0; y < this.maxHeight; y++) { 
+                const ladderCube = new Cube(this.gl);
+                ladderCube.setPosition(ladderCenterX, y + 0.5, ladderCenterZ);
+                ladderCube.setScale(ladderThickness, 1, 1); // Thin in X, full size in Y and Z
+                ladderCube.type = 'ladder';
+                this.cubes.push(ladderCube);
+            }
+        }
+
+        // Corner 2: Top-Right (near x=mapSize-1, z=0)
+        hx = this.mapSize - 1 - holeSize; 
+        hz = 1;
+        if (hx >= 0 && hz + holeSize <= this.mapSize) {
+            this.cornerHoleDetails.push({ x: hx, z: hz, size: holeSize });
+            for (let i = 0; i < holeSize; i++) {
+                for (let j = 0; j < holeSize; j++) {
+                    this.map[hx + i][hz + j] = 0;
+                }
+            }
+            // Add ladder for Corner 2
+            // Ladder is on the max-X side of the (hx, hz) cell
+            const ladderCenterX = hx + 1.5 - ladderThickness / 2;
+            const ladderCenterZ = hz;
+            for (let y = 0; y < this.maxHeight; y++) {
+                const ladderCube = new Cube(this.gl);
+                ladderCube.setPosition(ladderCenterX, y + 0.5, ladderCenterZ);
+                ladderCube.setScale(ladderThickness, 1, 1); // Thin in X
+                ladderCube.type = 'ladder';
+                this.cubes.push(ladderCube);
+            }
+        }
+
+        // Corner 3: Bottom-Left (near x=0, z=mapSize-1)
+        hx = 1;
+        hz = this.mapSize - 1 - holeSize; 
+        if (hx + holeSize <= this.mapSize && hz >= 0) {
+            this.cornerHoleDetails.push({ x: hx, z: hz, size: holeSize });
+            for (let i = 0; i < holeSize; i++) {
+                for (let j = 0; j < holeSize; j++) {
+                    this.map[hx + i][hz + j] = 0;
+                }
+            }
+            // Add ladder for Corner 3
+            // Ladder is on the min-X side of the (hx, hz) cell
+            const ladderCenterX = hx - 0.5 + ladderThickness / 2;
+            const ladderCenterZ = hz;
+            for (let y = 0; y < this.maxHeight; y++) {
+                const ladderCube = new Cube(this.gl);
+                ladderCube.setPosition(ladderCenterX, y + 0.5, ladderCenterZ);
+                ladderCube.setScale(ladderThickness, 1, 1); // Thin in X
+                ladderCube.type = 'ladder';
+                this.cubes.push(ladderCube);
+            }
+        }
+        
+        // Corner 4: Bottom-Right (near x=mapSize-1, z=mapSize-1)
+        hx = this.mapSize - 1 - holeSize; 
+        hz = this.mapSize - 1 - holeSize; 
+        if (hx >= 0 && hz >= 0) {
+            this.cornerHoleDetails.push({ x: hx, z: hz, size: holeSize });
+            for (let i = 0; i < holeSize; i++) {
+                for (let j = 0; j < holeSize; j++) {
+                    this.map[hx + i][hz + j] = 0;
+                }
+            }
+            // Add ladder for Corner 4
+            // Ladder is on the max-X side of the (hx, hz) cell
+            const ladderCenterX = hx + 1.5 - ladderThickness / 2;
+            const ladderCenterZ = hz;
+            for (let y = 0; y < this.maxHeight; y++) {
+                const ladderCube = new Cube(this.gl);
+                ladderCube.setPosition(ladderCenterX, y + 0.5, ladderCenterZ);
+                ladderCube.setScale(ladderThickness, 1, 1); // Thin in X
+                ladderCube.type = 'ladder';
+                this.cubes.push(ladderCube);
             }
         }
         
@@ -144,7 +244,8 @@ class PoolRoom {
             skyboxFloor: this.createPlaceholderTexture([200, 200, 230, 255]),
             skyboxWall: this.createPlaceholderTexture([120, 180, 255, 255]),
             pillar: this.createPlaceholderTexture([220, 220, 220, 255]),
-            poolWall: this.createPlaceholderTexture([120, 180, 255, 255])
+            poolWall: this.createPlaceholderTexture([120, 180, 255, 255]),
+            ladder: this.createPlaceholderTexture([100, 70, 30, 255]), // Brown placeholder for ladder
         };
 
         // Add textures for different block types
@@ -173,6 +274,7 @@ class PoolRoom {
         });
         this.loadTextureFromFile('textures/skybox_render.jpg', 'skyboxWall');
         this.loadTextureFromFile('textures/stone_bricks.png', 'poolWall');
+        this.loadTextureFromFile('textures/ladder_texture.png', 'ladder'); // Ensure you have ladder_texture.png
     }
 
     // Create placeholder texture with a specific color
@@ -300,13 +402,35 @@ class PoolRoom {
     buildWorld() {
         const gl = this.gl;
         
-        // Create ceiling at max height - EXTENDED to cover entire room including over windows
+        // Create ceiling at max height - MODIFIED to include skylight gaps
+        const gapX1 = 11; // X-coordinate for the first skylight gap (between pillar columns at X=8 and X=14)
+        const gapX2 = 17; // X-coordinate for the second skylight gap (between pillar columns at X=14 and X=20)
+        const gapStartZ = 8; // Starting Z-coordinate for the gaps (aligned with pillar start)
+        const gapEndZ = 20;  // Ending Z-coordinate for the gaps (aligned with pillar end)
+
         for (let x = 0; x < this.mapSize; x++) {
             for (let z = 0; z < this.mapSize; z++) {
-                const ceiling = new Cube(gl);
-                ceiling.setPosition(x, this.maxHeight + 0.5, z);
-                ceiling.type = 'ceiling';
-                this.cubes.push(ceiling);
+                // Determine if the current cell (x,z) is part of a central skylight gap
+                const isCentralGapCell = 
+                    (x === gapX1 || x === gapX2) && 
+                    (z >= gapStartZ && z <= gapEndZ);
+
+                // Determine if the current cell (x,z) is part of a corner gap
+                let isCornerGapCell = false;
+                for (const hole of this.cornerHoleDetails) {
+                    if (x >= hole.x && x < hole.x + hole.size &&
+                        z >= hole.z && z < hole.z + hole.size) {
+                        isCornerGapCell = true;
+                        break;
+                    }
+                }
+
+                if (!isCentralGapCell && !isCornerGapCell) { // Only create a ceiling cube if it's not any gap cell
+                    const ceiling = new Cube(gl);
+                    ceiling.setPosition(x, this.maxHeight + 0.5, z);
+                    ceiling.type = 'ceiling';
+                    this.cubes.push(ceiling);
+                }
             }
         }
         
@@ -412,6 +536,61 @@ class PoolRoom {
         this.poolWalls.push(eastWall);
     }
     
+    // Add this method to your PoolRoom class
+    getLadderAt(playerPosition, playerDimensions) {
+        const px = playerPosition[0];
+        const py = playerPosition[1]; // Assuming playerPosition is base of player
+        const pz = playerPosition[2];
+        const pWidth = playerDimensions[0];
+        const pHeight = playerDimensions[1];
+        const pDepth = playerDimensions[2];
+
+        // Player's AABB (center is at py + pHeight/2 if playerPosition is base)
+        const playerCenterY = py + pHeight / 2;
+        const playerMinX = px - pWidth / 2;
+        const playerMaxX = px + pWidth / 2;
+        const playerMinY = playerCenterY - pHeight / 2;
+        const playerMaxY = playerCenterY + pHeight / 2;
+        const playerMinZ = pz - pDepth / 2;
+        const playerMaxZ = pz + pDepth / 2;
+
+        for (const cube of this.cubes) {
+            if (cube.type === 'ladder') {
+                const m = cube.modelMatrix.elements;
+                // Center of the ladder segment
+                const ladderCenterX = m[12];
+                const ladderCenterY = m[13];
+                const ladderCenterZ = m[14];
+                
+                // Dimensions of the ladder segment (from its scale)
+                // Assuming no complex rotations, scale is directly from matrix diagonal
+                const ladderWidth = m[0];  // Scale X
+                const ladderHeight = m[5]; // Scale Y
+                const ladderDepth = m[10]; // Scale Z
+
+                // Ladder segment's AABB
+                const ladderMinX = ladderCenterX - ladderWidth / 2;
+                const ladderMaxX = ladderCenterX + ladderWidth / 2;
+                const ladderMinY = ladderCenterY - ladderHeight / 2;
+                const ladderMaxY = ladderCenterY + ladderHeight / 2;
+                const ladderMinZ = ladderCenterZ - ladderDepth / 2;
+                const ladderMaxZ = ladderCenterZ + ladderDepth / 2;
+
+                // AABB intersection test
+                const intersects = (
+                    playerMinX <= ladderMaxX && playerMaxX >= ladderMinX &&
+                    playerMinY <= ladderMaxY && playerMaxY >= ladderMinY &&
+                    playerMinZ <= ladderMaxZ && playerMaxZ >= ladderMinZ
+                );
+
+                if (intersects) {
+                    return cube; // Return the ladder cube being intersected
+                }
+            }
+        }
+        return null; // No ladder intersection
+    }
+
     // Render the entire poolroom
     render(gl, program, camera) {
         const viewMatrix = camera.viewMatrix;
@@ -522,9 +701,15 @@ class PoolRoom {
                 const height = cube.modelMatrix.elements[5]; // Y scale
                 gl.uniform2f(u_TexScale, 1.0, height);  // 1 tile wide, height tiles tall
             }
+            else if (cube.type === 'ladder') {
+                gl.bindTexture(gl.TEXTURE_2D, this.textures.ladder);
+                gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0); // Use full texture color
+                gl.uniform1f(u_texColorWeight, 1.0);
+                gl.uniform2f(u_TexScale, 1.0, 1.0); // Texture repeats on each 1x1 cube segment
+            }
             else {
-                // Default texture handling
-                gl.bindTexture(gl.TEXTURE_2D, this.textures.wall);
+                // Default texture handling (likely for 'floor' blocks from map data)
+                gl.bindTexture(gl.TEXTURE_2D, this.textures.wall); // Or this.textures.floor if appropriate
                 gl.uniform4f(u_baseColor, 1.0, 1.0, 1.0, 1.0);
                 gl.uniform1f(u_texColorWeight, 0.95);
                 gl.uniform2f(u_TexScale, 1.0, 1.0);  // Default 1:1 scaling

@@ -1,5 +1,7 @@
+import { Vector3 } from './Vector3.js';
+
 // camera.js - Update to include collision detection and sprint, preserving scale illusion
-class Camera {
+export class Camera {
     constructor(gl) {
         // Set up camera properties - PRESERVE LOW POSITION FOR SCALE ILLUSION
         this.position = new Vector3([3.0, 0.3, 12.0]); // Low position maintained for scale illusion
@@ -117,17 +119,17 @@ class Camera {
         this.previousPosition.set(this.position);
         
         // Calculate new position based on input
-        let newPosition = new Vector3(this.position.elements);
+        let newPosition = new Vector3([...this.position.elements]);
         
         if (direction === 'FORWARD') {
-            const moveVec = new Vector3(this.front.elements);
+            const moveVec = new Vector3([...this.front.elements]);
             moveVec.elements[1] = 0; // Zero Y component for walking
             moveVec.normalize();
             moveVec.mul(velocity);
             newPosition.add(moveVec);
         }
         if (direction === 'BACKWARD') {
-            const moveVec = new Vector3(this.front.elements);
+            const moveVec = new Vector3([...this.front.elements]);
             moveVec.elements[1] = 0;
             moveVec.normalize();
             moveVec.mul(-velocity);
@@ -177,7 +179,7 @@ class Camera {
         }
         
         // Apply velocity
-        const newPos = new Vector3(this.position.elements);
+        const newPos = new Vector3([...this.position.elements]);
         newPos.elements[0] += this.velocity.elements[0] * deltaTime;
         newPos.elements[1] += this.velocity.elements[1] * deltaTime;
         newPos.elements[2] += this.velocity.elements[2] * deltaTime;
@@ -222,7 +224,7 @@ class Camera {
             this.gravity = -2.0;
             
             // Allow swimming up with space
-            if (keys[' ']) {
+            if (this.isGrounded) {
                 this.velocity.elements[1] = 3.0;
             }
             

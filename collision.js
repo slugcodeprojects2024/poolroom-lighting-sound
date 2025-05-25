@@ -1,12 +1,12 @@
-// collision.js - Simple collision detection for grid-based world
+// collision.js - Fixed collision detection with pillar support
 // Fixed to work with the actual PoolRoom implementation
 
-class CollisionHandler {
+export class CollisionHandler {
     constructor(poolRoom) {
         this.poolRoom = poolRoom;
         this.collisionBoxes = [];
         this.waterAreas = [];
-        this.enabled = true; // Collision detection starts enabled
+        this.enabled = true;
         
         // Add pool walls to collision objects
         this.poolWalls = [];
@@ -34,6 +34,13 @@ class CollisionHandler {
         }
     }
     
+    // Update collision objects when blocks are added/removed
+    updateCollisionObjects() {
+        if (this.poolRoom) {
+            this.initCollisionObjects();
+        }
+    }
+    
     // Toggle collision detection on/off
     toggleCollision() {
         this.enabled = !this.enabled;
@@ -52,24 +59,38 @@ class CollisionHandler {
             return;
         }
         
+        // Add collision for all cubes including pillars
+        if (this.poolRoom.cubes) {
+            for (const cube of this.poolRoom.cubes) {
+                // Get cube position and scale from its matrix
+                const matrix = cube.modelMatrix.elements;
+                const posX = matrix[12];
+                const posY = matrix[13];
+                const posZ = matrix[14];
+                
+                // For scale, we need to look at the diagonal elements
+                const scaleX = Math.sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1] + matrix[2] * matrix[2]);
+                const scaleY = Math.sqrt(matrix[4] * matrix[4] + matrix[5] * matrix[5] + matrix[6] * matrix[6]);
+                const scaleZ = Math.sqrt(matrix[8] * matrix[8] + matrix[9] * matrix[9] + matrix[10] * matrix[10]);
+                
+                // Create collision box for this cube
+                this.collisionBoxes.push({
+                    minX: posX - scaleX/2,
+                    maxX: posX + scaleX/2,
+                    minY: posY - scaleY/2,
+                    maxY: posY + scaleY/2,
+                    minZ: posZ - scaleZ/2,
+                    maxZ: posZ + scaleZ/2,
+                    type: cube.type // Keep track of cube type for debugging
+                });
+            }
+        }
+        
+        // Add invisible barriers for window openings
         for (let x = 0; x < this.poolRoom.mapSize; x++) {
             for (let z = 0; z < this.poolRoom.mapSize; z++) {
                 const height = this.poolRoom.map[x][z];
                 
-                if (height > 0) {
-                    // Create collision box for wall blocks
-                    this.collisionBoxes.push({
-                        minX: x - 0.5,
-                        maxX: x + 0.5,
-                        minY: 0,
-                        maxY: height,
-                        minZ: z - 0.5,
-                        maxZ: z + 0.5
-                    });
-                }
-                
-                // Add invisible barriers for window openings
-                // Check if this is a window opening (perimeter with height 0)
                 if (height === 0 && 
                     (x === 0 || x === this.poolRoom.mapSize - 1 || 
                      z === 0 || z === this.poolRoom.mapSize - 1)) {
@@ -122,7 +143,7 @@ class CollisionHandler {
             minX: poolStart,
             maxX: poolStart + poolSize,
             minY: -1.0, // Bottom of water volume
-            maxY: -0.05, // Slightly below ground level
+            maxY: -0.05, // Water surface level
             minZ: poolStart,
             maxZ: poolStart + poolSize
         });
@@ -192,7 +213,7 @@ class CollisionHandler {
         }
         
         // Continue with the rest of the collision checks
-        // Special window edge check - prevent falling through window but allow getting close
+        // Special window edge check - prevent falling through window
         const isOutsideWorld = (
             newPosition[0] < -0.45 || 
             newPosition[0] > this.poolRoom.mapSize - 0.55 ||
@@ -202,11 +223,10 @@ class CollisionHandler {
         
         if (isOutsideWorld) {
             console.log('Preventing falling outside world');
-            // Just reset to previous position if trying to go outside world boundaries
             return previousPosition;
         }
         
-        // Detect if we're near a window edge and reduce collision radius further
+        // Detect if we're near a window edge
         const isNearEdge = (
             newPosition[0] < 1.0 || 
             newPosition[0] > this.poolRoom.mapSize - 2 ||
@@ -230,7 +250,7 @@ class CollisionHandler {
             newPosition[2] = previousPosition[2];
         }
         
-        // Check Y movement (for jumping/falling) - improved pool detection
+        // Check Y movement (for jumping/falling)
         testPos = [newPosition[0], newPosition[1], newPosition[2]];
         if (this.isPositionColliding(testPos, effectiveRadius)) {
             const poolBottom = -1.0; // Pool bottom Y-coordinate
@@ -265,7 +285,6 @@ class CollisionHandler {
                 position[1] - radius < box.maxY &&
                 position[2] + radius > box.minZ &&
                 position[2] - radius < box.maxZ) {
-                console.log("Collision detected with box:", box);
                 return true; // Collision detected
             }
         }
@@ -284,18 +303,6 @@ class CollisionHandler {
             }
         }
         
-        return false;
-    }
-    
-    // Check if position is near the pool bottom (to prevent falling through)
-    isNearPoolBottom(position, radius) {
-        for (const water of this.waterAreas) {
-            if (position[0] >= water.minX && position[0] <= water.maxX &&
-                position[1] >= water.minY - radius && position[1] <= water.minY + radius * 2 &&
-                position[2] >= water.minZ && position[2] <= water.maxZ) {
-                return true;
-            }
-        }
         return false;
     }
     

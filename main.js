@@ -1,3 +1,9 @@
+import { Vector3 } from './Vector3.js';
+import { Camera } from './camera.js';
+import { InputManager } from './InputManager.js';
+import { CollisionHandler } from './collision.js';
+import { PoolRoom } from './poolRoom.js';
+import { Player } from './Player.js';
 // main.js - Main application entry point with collision detection and sprint
 let gl;
 let program;
@@ -14,6 +20,9 @@ let canvas;
 let frameCount = 0;
 let fpsTime = 0;
 let fps = 0;
+
+let inputManager;
+let player;
 
 // Initialize WebGL context
 function init() {
@@ -128,52 +137,12 @@ function setupEventListeners(canvas) {
         }
     });
 
-    // Add dedicated click handler specifically for block placement
+    // Add dedicated click handler
     document.addEventListener('click', function(event) {
-        // Only process block placement when pointer is locked
-        if (document.pointerLockElement === canvas || 
-            document.mozPointerLockElement === canvas) {
-            
-            // Left-click to add block
-            if (event.button === 0) {
-                console.log("Left click detected - placing block");
-                const pos = camera.getTargetBlock(5.0, 0.1);
-                console.log("Target position:", pos);
-                const blockType = blockIndicator.getCurrentBlockType();
-                const success = poolRoom.addBlock(pos.x, pos.y, pos.z, blockType);
-                
-                // Update collision objects if block was added
-                if (success) {
-                    console.log("Block placed successfully");
-                    collisionHandler.updateCollisionObjects();
-                    showNotification(`Block placed: ${blockIndicator.blockTypeNames[blockType]}`, 1000);
-                } else {
-                    console.log("Failed to place block");
-                }
-            }
-        }
-    });
-
-    // Right-click handler for block removal
-    canvas.addEventListener('contextmenu', function(event) {
-        // Prevent browser context menu
-        event.preventDefault();
-        
         // Only process when pointer is locked
         if (document.pointerLockElement === canvas || 
             document.mozPointerLockElement === canvas) {
-            
-            console.log("Right click detected - removing block");
-            // Remove the last placed block
-            const success = poolRoom.removeLastBlock();
-            
-            // Update collision objects if block was removed
-            if (success) {
-                collisionHandler.updateCollisionObjects();
-                showNotification('Last block removed', 1000);
-            } else {
-                showNotification('No blocks to remove', 1000);
-            }
+            // Handle any click-related functionality here if needed
         }
     });
 

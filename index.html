@@ -154,6 +154,9 @@
         <div class="stamina-label">Stamina</div>
     </div>
 
+    <!-- Status display for player info -->
+    <div id="statusDisplay" style="position:fixed; top:30px; left:10px; color:white; background:rgba(0,0,0,0.7); padding:5px; font-family: monospace; z-index: 100;"></div>
+
     <!-- Shader scripts -->
     <script id="vertex-shader" type="x-shader/x-vertex">
         attribute vec4 a_Position;
@@ -162,9 +165,12 @@
         uniform mat4 u_ViewMatrix;
         uniform mat4 u_ProjectionMatrix;
         varying vec2 v_TexCoord;
+        varying vec3 v_WorldPos;
 
         void main() {
-            gl_Position = u_ProjectionMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;
+            vec4 worldPos = u_ModelMatrix * a_Position;
+            v_WorldPos = worldPos.xyz;
+            gl_Position = u_ProjectionMatrix * u_ViewMatrix * worldPos;
             v_TexCoord = a_TexCoord;
         }
     </script>
@@ -174,28 +180,51 @@
         uniform sampler2D u_Sampler;
         uniform float u_texColorWeight;
         uniform vec4 u_baseColor;
-        uniform vec2 u_TexScale; // Add this uniform for texture tiling
+        uniform vec2 u_TexScale;
+        uniform bool u_isUnderwater;
+        uniform vec3 u_cameraPos;
         varying vec2 v_TexCoord;
+        varying vec3 v_WorldPos;
 
         void main() {
             // Scale texture coordinates for tiling
             vec2 scaledTexCoord = v_TexCoord * u_TexScale;
             vec4 texColor = texture2D(u_Sampler, scaledTexCoord);
-            gl_FragColor = mix(u_baseColor, texColor, u_texColorWeight);
+            vec4 finalColor = mix(u_baseColor, texColor, u_texColorWeight);
+            
+            // Apply underwater effects
+            if (u_isUnderwater) {
+                // Calculate distance from camera for fog effect
+                float distance = length(v_WorldPos - u_cameraPos);
+                
+                // Underwater fog parameters
+                float fogDensity = 0.15;
+                float fogAmount = 1.0 - exp(-fogDensity * distance);
+                fogAmount = clamp(fogAmount, 0.0, 0.85); // Don't make it completely opaque
+                
+                // Underwater fog color (deep blue-green)
+                vec3 fogColor = vec3(0.0, 0.3, 0.5);
+                
+                // Apply fog
+                finalColor.rgb = mix(finalColor.rgb, fogColor, fogAmount);
+                
+                // Add a blue-green tint to everything
+                finalColor.rgb *= vec3(0.6, 0.85, 1.0);
+                
+                // Slightly reduce contrast underwater
+                finalColor.rgb = mix(finalColor.rgb, vec3(0.5), 0.2);
+            }
+            
+            gl_FragColor = finalColor;
         }
     </script>
 
     <!-- Library scripts -->
     <script src="lib/cuon-matrix.js"></script>
     <script src="lib/cuon-utils.js"></script>
-    
-    <!-- Application scripts -->
-    <script src="camera.js"></script>
-    <script src="cube.js"></script>
-    <script src="collision.js"></script>
-    <script src="poolRoom.js"></script>
-    <script src="world.js"></script>
-    <script src="main.js"></script>
+
+    <!-- Only main entry point -->
+    <script type="module" src="main.js"></script>
     
     <script>
         // Update stamina bar display
