@@ -1,6 +1,6 @@
 import { CubeWithNormals } from './geometryWithNormals.js';
 
-// Updated poolRoom.js with lighting support
+// Updated poolRoom.js with lighting support and four skylights
 export class PoolRoomWithLighting {
     constructor(gl) {
         this.gl = gl;
@@ -395,16 +395,19 @@ export class PoolRoomWithLighting {
     buildWorld() {
         const gl = this.gl;
         
-        // Create ceiling with skylight gaps
-        const gapX1 = 11;
-        const gapX2 = 17;
+        // Create ceiling with FOUR skylight gaps evenly spaced
+        // Pattern: wall skylight pillar skylight pillar skylight pillar skylight wall
+        const gapX1 = 7;   // First skylight
+        const gapX2 = 11;  // Second skylight  
+        const gapX3 = 17;  // Third skylight
+        const gapX4 = 21;  // Fourth skylight
         const gapStartZ = 8;
         const gapEndZ = 20;
 
         for (let x = 0; x < this.mapSize; x++) {
             for (let z = 0; z < this.mapSize; z++) {
                 const isCentralGapCell = 
-                    (x === gapX1 || x === gapX2) && 
+                    (x === gapX1 || x === gapX2 || x === gapX3 || x === gapX4) && 
                     (z >= gapStartZ && z <= gapEndZ);
 
                 let isCornerGapCell = false;

@@ -135,7 +135,7 @@
     <!-- Crosshair -->
     <div id="crosshair"></div>
 
-    <!-- Updated Shader scripts with lighting support -->
+    <!-- Updated Shader scripts with enhanced lighting support -->
     <script id="vertex-shader" type="x-shader/x-vertex">
         attribute vec4 a_Position;
         attribute vec2 a_TexCoord;
@@ -190,11 +190,18 @@
         uniform bool u_lightingEnabled;
         uniform bool u_normalVisualization;
         uniform vec3 u_LightColor;
+        uniform vec3 u_LightPos;
         uniform vec3 u_SpotLightPos;
         uniform vec3 u_SpotLightDir;
         uniform float u_SpotLightCutoff;
         uniform bool u_pointLightEnabled;
         uniform bool u_spotLightEnabled;
+
+        // Enhanced sun lighting uniforms
+        uniform vec3 u_SunColor;
+        uniform float u_SunIntensity;
+        uniform vec3 u_AmbientColor;
+        uniform vec3 u_CameraPos;
 
         varying vec2 v_TexCoord;
         varying vec3 v_WorldPos;
@@ -224,8 +231,8 @@
             vec3 lightDir = normalize(v_LightDir);
             vec3 viewDir = normalize(v_ViewDir);
             
-            // Phong lighting components
-            vec3 ambient = vec3(0.2, 0.2, 0.2); // Ambient light
+            // Enhanced ambient lighting for bright daytime feel
+            vec3 ambient = u_AmbientColor;
             vec3 finalColor = ambient * materialColor.rgb;
             
             // Point light contribution
@@ -242,27 +249,37 @@
                 finalColor += (diffuse + specular) * materialColor.rgb;
             }
             
-            // Spot light contribution
+            // ENHANCED: Powerful sun spot light contribution
             if (u_spotLightEnabled) {
                 vec3 spotLightDir = normalize(u_SpotLightPos - v_WorldPos);
                 float spotAngle = dot(spotLightDir, normalize(-u_SpotLightDir));
                 
                 if (spotAngle > u_SpotLightCutoff && dot(normal, spotLightDir) > 0.0) {
+                    // Smooth falloff from center to edge of spotlight cone
                     float intensity = (spotAngle - u_SpotLightCutoff) / (1.0 - u_SpotLightCutoff);
-                    intensity = clamp(intensity, 0.0, 1.0);
+                    intensity = pow(clamp(intensity, 0.0, 1.0), 0.5); // Softer falloff curve
                     
-                    // Diffuse component
-                    float diff = max(dot(normal, spotLightDir), 0.0);
-                    vec3 diffuse = diff * u_LightColor * intensity;
+                    // Enhanced sun lighting with much higher intensity
+                    float sunDiffuse = max(dot(normal, spotLightDir), 0.0);
+                    vec3 sunColor = u_SunColor * u_SunIntensity; // Apply intensity multiplier
+                    vec3 diffuse = sunDiffuse * sunColor * intensity;
                     
-                    // Specular component
+                    // Brighter specular highlights from the sun
                     vec3 reflectDir = reflect(-spotLightDir, normal);
-                    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
-                    vec3 specular = spec * u_LightColor * intensity * 0.5;
+                    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 16.0); // Slightly softer specular
+                    vec3 specular = spec * sunColor * intensity * 0.8; // Stronger specular from sun
                     
-                    finalColor += (diffuse + specular) * materialColor.rgb;
+                    // Distance attenuation (very gentle for the distant sun)
+                    float distance = length(u_SpotLightPos - v_WorldPos);
+                    float attenuation = 1.0 / (1.0 + 0.0001 * distance + 0.000001 * distance * distance);
+                    
+                    finalColor += (diffuse + specular) * materialColor.rgb * attenuation;
                 }
             }
+            
+            // Tone mapping for bright lighting (prevents overexposure)
+            finalColor = finalColor / (finalColor + vec3(1.0));
+            finalColor = pow(finalColor, vec3(1.0/2.2)); // Gamma correction
             
             gl_FragColor = vec4(finalColor, materialColor.a);
         }
