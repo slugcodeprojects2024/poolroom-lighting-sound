@@ -1,84 +1,96 @@
+// Updated main.js - Complete integration
 import { Vector3 } from './Vector3.js';
 import { Camera } from './camera.js';
-import { InputManager } from './InputManager.js';
 import { CollisionHandler } from './collision.js';
-import { PoolRoom } from './poolRoom.js';
+import { PoolRoomWithLighting } from './poolRoom.js';
+import { LightingSystem } from './lighting.js';
+import { CubeWithNormals, Sphere } from './geometryWithNormals.js';
+import { Model } from './objLoader.js';
+import { CollectibleSystem } from './collectibles.js';
 
-// Main application entry point with collision detection and sprint
+// Main application with complete lighting and collectibles
 let gl;
 let program;
 let camera;
 let poolRoom;
 let collisionHandler;
+let lightingSystem;
+let collectibleSystem;
 let lastTime = 0;
 let keys = {};
 let mouseX = 0, mouseY = 0;
 let mouseDown = false;
 let canvas;
 
-// FPS tracking variables
+// FPS tracking
 let frameCount = 0;
 let fpsTime = 0;
 let fps = 0;
 
-// Ladder climbing variables
+// Ladder climbing
 let isOnLadder = false;
 let ladderSpeed = 3.0;
 
+// Assignment 4 objects
+let testCube;
+let testSphere;
+
 // Initialize WebGL context
 function init() {
-    // Get the canvas element
     canvas = document.getElementById('webgl');
     
-    // Get the WebGL context
     gl = canvas.getContext('webgl');
     if (!gl) {
         console.error('WebGL not supported by your browser!');
         return;
     }
     
-    // Adjust canvas to full window size
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     gl.viewport(0, 0, canvas.width, canvas.height);
     
-    // Enable depth testing for 3D rendering
     gl.enable(gl.DEPTH_TEST);
     
-    // Initialize shaders
-    initShaders();
+    // Initialize shaders with lighting support
+    initShadersWithLighting();
     
     // Create camera
     camera = new Camera(gl);
     
-    // Create the poolroom
-    poolRoom = new PoolRoom(gl);
+    // Create the poolroom with lighting support
+    poolRoom = new PoolRoomWithLighting(gl);
     
-    // Create collision handler and link it to camera
+    // Create collision handler
     collisionHandler = new CollisionHandler(poolRoom);
     camera.setCollisionHandler(collisionHandler);
+    
+    // Initialize lighting system with sun
+    lightingSystem = new LightingSystem(gl);
+    lightingSystem.initLightMarkers(CubeWithNormals);
+    
+    // Initialize collectible system
+    collectibleSystem = new CollectibleSystem(gl, poolRoom);
+    
+    // Create Assignment 4 required objects
+    createAssignment4Objects();
     
     // Set up event listeners
     setupEventListeners(canvas);
     
-    console.log('Game initialized with ladder climbing system');
-    console.log('Controls: WASD to move, F near ladder to climb, W/S to climb up/down');
+    console.log('🎉 Assignment 4 Complete System Loaded!');
+    console.log('☀️ Sun lighting + 📦 Collectibles + 🌟 Full Phong lighting');
+    console.log('Controls: WASD - Move | L - Toggle Lighting | N - Toggle Normals');
     
-    // Start the render loop
     lastTime = performance.now();
     render();
 }
 
-// Initialize shaders
-function initShaders() {
-    // Get shader source from HTML script tags
+// Initialize shaders with lighting
+function initShadersWithLighting() {
     const vertexShaderSource = document.getElementById('vertex-shader').text;
     const fragmentShaderSource = document.getElementById('fragment-shader').text;
     
-    // Create shader program
     program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
-    
-    // Use the program
     gl.useProgram(program);
 }
 
@@ -114,15 +126,29 @@ function createShader(gl, type, source) {
     return shader;
 }
 
-// Check for ladder proximity and update UI
+// Create Assignment 4 required objects
+function createAssignment4Objects() {
+    // Cube with normals (Assignment 4 requirement)
+    testCube = new CubeWithNormals(gl);
+    testCube.setPosition(10, 1, 10);
+    testCube.setScale(2, 2, 2);
+    
+    // Sphere with procedural generation (Assignment 4 requirement)
+    testSphere = new Sphere(gl, 1.0, 20);
+    testSphere.setPosition(20, 2, 10);
+    testSphere.setScale(2, 2, 2);
+    
+    console.log('✅ Assignment 4 objects created: Cube + Sphere with normals');
+}
+
+// Check for ladder proximity
 function checkLadderProximity() {
     const cameraPos = camera.position.elements;
-    const playerPos = [cameraPos[0], cameraPos[1] - 1.6, cameraPos[2]]; // Adjust for eye height
+    const playerPos = [cameraPos[0], cameraPos[1] - 1.6, cameraPos[2]];
     const playerDims = [0.8, 1.8, 0.8];
     
     const nearLadder = poolRoom.getLadderAt(playerPos, playerDims);
     
-    // Update UI hints
     if (nearLadder && !isOnLadder) {
         if (window.showLadderHint) window.showLadderHint();
     } else {
@@ -138,28 +164,25 @@ function checkLadderProximity() {
     return nearLadder;
 }
 
-// Handle keyboard and mouse events
+// Setup event listeners
 function setupEventListeners(canvas) {
     // Keyboard events
     document.addEventListener('keydown', function(event) {
         keys[event.key] = true;
         
-        // Handle jump with spacebar (only when not climbing)
         if (event.key === ' ' && !isOnLadder) {
             camera.jump();
         }
         
-        // Handle sprint with Shift key
         if (event.key === 'Shift') {
             camera.setSprint(true);
         }
         
-        // Toggle collision with 'C' key
         if (event.key === 'c' || event.key === 'C') {
             collisionHandler.toggleCollision();
         }
         
-        // Ladder climbing toggle with F key
+        // Ladder climbing
         if (event.key === 'f' || event.key === 'F') {
             const cameraPos = camera.position.elements;
             const playerPos = [cameraPos[0], cameraPos[1] - 1.6, cameraPos[2]];
@@ -171,7 +194,6 @@ function setupEventListeners(canvas) {
                 isOnLadder = !isOnLadder;
                 
                 if (isOnLadder) {
-                    // Snap to ladder center when starting to climb
                     const ladderMatrix = nearLadder.modelMatrix.elements;
                     camera.position.elements[0] = ladderMatrix[12];
                     camera.position.elements[2] = ladderMatrix[14];
@@ -186,13 +208,12 @@ function setupEventListeners(canvas) {
     document.addEventListener('keyup', function(event) {
         keys[event.key] = false;
         
-        // Stop sprinting when Shift is released
         if (event.key === 'Shift') {
             camera.setSprint(false);
         }
     });
     
-    // Mouse movement events
+    // Mouse events
     document.addEventListener('mousemove', function(event) {
         if (mouseDown) {
             const xOffset = event.clientX - mouseX;
@@ -204,14 +225,11 @@ function setupEventListeners(canvas) {
         }
     });
     
-    // Add separate mousedown and click handlers
     canvas.addEventListener('mousedown', function(event) {
-        // This just captures the initial mouse press
         mouseDown = true;
         mouseX = event.clientX;
         mouseY = event.clientY;
         
-        // Request pointer lock if not already locked
         if (document.pointerLockElement !== canvas && 
             document.mozPointerLockElement !== canvas) {
             canvas.requestPointerLock = canvas.requestPointerLock ||
@@ -220,9 +238,7 @@ function setupEventListeners(canvas) {
         }
     });
 
-    // Add dedicated click handler for ladder interaction
     document.addEventListener('click', function(event) {
-        // Only process when pointer is locked
         if (document.pointerLockElement === canvas || 
             document.mozPointerLockElement === canvas) {
             
@@ -251,68 +267,50 @@ function setupEventListeners(canvas) {
         mouseDown = false;
     });
 
-    // Pointer lock change event
+    // Pointer lock events
     document.addEventListener('pointerlockchange', lockChangeAlert, false);
     document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
-
-    // Add pointer lock error handling
-    document.addEventListener('pointerlockerror', function() {
-        console.error("Error obtaining pointer lock");
-    }, false);
-    document.addEventListener('mozpointerlockerror', function() {
-        console.error("Error obtaining pointer lock (moz)");
-    }, false);
     
     function lockChangeAlert() {
         if (document.pointerLockElement === canvas ||
             document.mozPointerLockElement === canvas) {
-            console.log("Pointer locked successfully");
-            // Pointer locked - enable mouse movement tracking
             document.addEventListener('mousemove', updatePosition, false);
         } else {
-            console.log("Pointer unlocked");
-            // Pointer unlocked - disable mouse movement tracking
             document.removeEventListener('mousemove', updatePosition, false);
         }
     }
     
     function updatePosition(e) {
-        // Handle mouse movement with pointer lock
         const xOffset = e.movementX || e.mozMovementX || 0;
         const yOffset = e.movementY || e.mozMovementY || 0;
         
         camera.processMouseMovement(xOffset, yOffset);
     }
     
-    // Window resize event
+    // Window resize
     window.addEventListener('resize', function() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         gl.viewport(0, 0, canvas.width, canvas.height);
         
-        // Update projection matrix for new aspect ratio
         const aspect = canvas.width / canvas.height;
         camera.projectionMatrix.setPerspective(camera.fov, aspect, 0.05, 1000.0);
     });
 }
 
-// Process keyboard input
+// Process input
 function processInput(deltaTime) {
     const nearLadder = checkLadderProximity();
     
     if (isOnLadder && nearLadder) {
-        // LADDER CLIMBING MODE
-        
-        // IMPORTANT: Disable collision detection while climbing
+        // Ladder climbing mode
         const originalCollisionState = collisionHandler.enabled;
         collisionHandler.enabled = false;
         
-        // Override gravity/physics while on ladder
         if (camera.velocity && camera.velocity.elements) {
-            camera.velocity.elements[1] = 0; // Stop falling
+            camera.velocity.elements[1] = 0;
         }
         
-        // Vertical movement only
         if (keys['w'] || keys['W']) {
             camera.position.elements[1] += ladderSpeed * deltaTime;
         }
@@ -320,39 +318,32 @@ function processInput(deltaTime) {
             camera.position.elements[1] -= ladderSpeed * deltaTime;
         }
         
-        // Keep player centered on ladder
         const ladderMatrix = nearLadder.modelMatrix.elements;
         camera.position.elements[0] = ladderMatrix[12];
         camera.position.elements[2] = ladderMatrix[14];
         
-        // Height limits - allow climbing to the actual roof level
-        const minHeight = 0.6;  // Ground level + eye height
-        const maxHeight = poolRoom.maxHeight + 1.5;  // Allow climbing onto the roof
+        const minHeight = 0.6;
+        const maxHeight = poolRoom.maxHeight + 1.5;
         
         if (camera.position.elements[1] < minHeight) {
             camera.position.elements[1] = minHeight;
         }
         if (camera.position.elements[1] > maxHeight) {
             camera.position.elements[1] = maxHeight;
-            console.log('Reached maximum climbing height - you can step off the ladder now');
         }
         
-        // Update camera vectors
         if (camera.updateCameraVectors) {
             camera.updateCameraVectors();
         }
         
-        // Re-enable collision for next frame
         collisionHandler.enabled = originalCollisionState;
         
     } else {
-        // NORMAL MOVEMENT MODE
+        // Normal movement
         if (isOnLadder) {
-            isOnLadder = false; // Lost ladder contact
-            console.log('Left ladder - normal movement resumed');
+            isOnLadder = false;
         }
         
-        // WASD keys for movement
         if (keys['w'] || keys['W']) {
             camera.processKeyboard('FORWARD', deltaTime);
         }
@@ -366,7 +357,6 @@ function processInput(deltaTime) {
             camera.processKeyboard('RIGHT', deltaTime);
         }
         
-        // QE keys for camera rotation
         if (keys['q'] || keys['Q']) {
             camera.processKeyboardRotation('LEFT');
         }
@@ -378,7 +368,6 @@ function processInput(deltaTime) {
 
 // Main render loop
 function render() {
-    // Calculate delta time
     const currentTime = performance.now();
     const deltaTime = (currentTime - lastTime) / 1000.0;
     lastTime = currentTime;
@@ -392,11 +381,17 @@ function render() {
         fpsTime = 0;
     }
     
-    // Process keyboard input
+    // Process input
     processInput(deltaTime);
     
     // Update physics
     camera.updatePhysics(deltaTime);
+    
+    // Update lighting system
+    lightingSystem.update(deltaTime);
+    
+    // Update collectibles system
+    collectibleSystem.update(deltaTime, camera.position.elements);
     
     // Check if underwater
     const isUnderwater = camera.collisionHandler.isInWater(camera.position.elements);
@@ -410,16 +405,29 @@ function render() {
     // Clear the canvas
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
-    // Render the poolroom
-    poolRoom.render(gl, program, camera);
+    // Set lighting uniforms
+    lightingSystem.setUniforms(gl, program, camera);
+    
+    // Render the poolroom with lighting
+    poolRoom.renderWithLighting(gl, program, camera, lightingSystem);
+    
+    // Render Assignment 4 objects
+    renderAssignment4Objects();
+    
+    // Render collectibles
+    collectibleSystem.render(gl, program, camera, lightingSystem);
+    
+    // Render light markers
+    lightingSystem.renderLightMarkers(gl, program, camera);
     
     // Update status display
     const statusText = `
         FPS: ${fps} | Collision: ${collisionHandler.enabled ? 'ON' : 'OFF'}<br>
         Position: ${camera.position.elements.map(v => v.toFixed(1)).join(', ')}<br>
         Climbing: ${isOnLadder ? 'YES' : 'NO'}<br>
-        Controls: WASD - Move | Mouse - Look | Space - Jump<br>
-        Click or F near ladder to climb | W/S to climb up/down while climbing
+        Lighting: ${lightingSystem.lightingEnabled ? 'ON' : 'OFF'} | Normals: ${lightingSystem.normalVisualization ? 'ON' : 'OFF'}<br>
+        Collectibles: ${collectibleSystem.collectedCount}/${collectibleSystem.totalCount}<br>
+        Controls: WASD - Move | L - Light | N - Normals | F - Climb | Walk near objects to collect
     `;
     document.getElementById('status').innerHTML = statusText;
     
@@ -432,5 +440,39 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// Start the application when the page loads
+// Render Assignment 4 required objects
+function renderAssignment4Objects() {
+    // Set default texture
+    const u_Sampler = gl.getUniformLocation(program, 'u_Sampler');
+    gl.uniform1i(u_Sampler, 0);
+    
+    // Create white texture if needed
+    if (!gl.whiteTexture) {
+        gl.whiteTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, gl.whiteTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                      new Uint8Array([255, 255, 255, 255]));
+    }
+    gl.bindTexture(gl.TEXTURE_2D, gl.whiteTexture);
+    
+    // Set texture scale
+    const u_TexScale = gl.getUniformLocation(program, 'u_TexScale');
+    gl.uniform2f(u_TexScale, 1.0, 1.0);
+    
+    // Render test cube (Assignment 4 requirement)
+    if (testCube) {
+        const u_baseColor = gl.getUniformLocation(program, 'u_baseColor');
+        gl.uniform4f(u_baseColor, 0.8, 0.3, 0.3, 1.0); // Red cube
+        testCube.render(gl, program, camera.viewMatrix, camera.projectionMatrix, 0.2, lightingSystem);
+    }
+    
+    // Render test sphere (Assignment 4 requirement)
+    if (testSphere) {
+        const u_baseColor = gl.getUniformLocation(program, 'u_baseColor');
+        gl.uniform4f(u_baseColor, 0.3, 0.8, 0.3, 1.0); // Green sphere
+        testSphere.render(gl, program, camera.viewMatrix, camera.projectionMatrix, 0.2, lightingSystem);
+    }
+}
+
+// Start the application
 window.onload = init;
