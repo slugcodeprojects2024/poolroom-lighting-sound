@@ -192,7 +192,7 @@ export class LightingSystem {
             </div>
             
             <div style="margin: 15px 0; padding: 10px; background: rgba(255,215,0,0.3); border-radius: 5px; border: 2px solid #ffd700;">
-                <h4 style="margin-top: 0; color: #ffd700;">☀️ POWERFUL SUN (Fixed)</h4>
+                <h4 style="margin-top: 0; color: #ffd700;">SUN LIGHTING</h4>
                 <label><input type="checkbox" id="spot-light-toggle" checked> Enable Sun Light</label><br>
                 <label><input type="checkbox" id="sun-rotation-toggle" checked> Slow Rotation</label><br>
                 <label style="display: block; margin-top: 8px;">Sun Intensity: <input type="range" id="sun-intensity" min="1.0" max="5.0" value="2.5" step="0.1" style="width: 140px;"></label>
