@@ -295,7 +295,7 @@ function setupEventListeners(canvas) {
         const xOffset = e.movementX || e.mozMovementX || 0;
         const yOffset = e.movementY || e.mozMovementY || 0;
         
-        camera.processMouseMovement(xOffset, yOffset);
+        camera.processMouseMovement(-xOffset, yOffset);
     }
     
     // Window resize
