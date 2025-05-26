@@ -203,7 +203,7 @@ export class CollectibleSystem {
         congratsDiv.innerHTML = `
             🎉 CONGRATULATIONS! 🎉<br>
             You collected all ${this.totalCount} items!<br>
-            <small style="font-size: 18px;">Assignment 4 Complete!</small>
+            <small style="font-size: 18px;">You collected all the poolroom items!</small>
         `;
         
         document.body.appendChild(congratsDiv);

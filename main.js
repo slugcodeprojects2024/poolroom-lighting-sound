@@ -171,24 +171,24 @@ function checkLadderProximity() {
 
 // Setup event listeners
 function setupEventListeners(canvas) {
-    // Keyboard events
+    // Keyboard events - Use event.code for more reliable key tracking
     document.addEventListener('keydown', function(event) {
-        keys[event.key] = true;
+        keys[event.code] = true;
         
-        if (event.key === ' ' && !isOnLadder) {
+        if (event.code === 'Space' && !isOnLadder) {
             camera.jump();
         }
         
-        if (event.key === 'Shift') {
+        if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
             camera.setSprint(true);
         }
         
-        if (event.key === 'c' || event.key === 'C') {
+        if (event.code === 'KeyC') {
             collisionHandler.toggleCollision();
         }
         
         // Ladder climbing
-        if (event.key === 'f' || event.key === 'F') {
+        if (event.code === 'KeyF') {
             const cameraPos = camera.position.elements;
             const playerPos = [cameraPos[0], cameraPos[1] - 1.6, cameraPos[2]];
             const playerDims = [0.8, 1.8, 0.8];
@@ -210,16 +210,16 @@ function setupEventListeners(canvas) {
         }
         
         // Toggle test objects visibility with 'T' key
-        if (event.key === 't' || event.key === 'T') {
+        if (event.code === 'KeyT') {
             showTestObjects = !showTestObjects;
             console.log(`Test objects ${showTestObjects ? 'shown' : 'hidden'}`);
         }
     });
     
     document.addEventListener('keyup', function(event) {
-        keys[event.key] = false;
+        keys[event.code] = false;
         
-        if (event.key === 'Shift') {
+        if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
             camera.setSprint(false);
         }
     });
@@ -322,10 +322,10 @@ function processInput(deltaTime) {
             camera.velocity.elements[1] = 0;
         }
         
-        if (keys['w'] || keys['W']) {
+        if (keys['KeyW']) {
             camera.position.elements[1] += ladderSpeed * deltaTime;
         }
-        if (keys['s'] || keys['S']) {
+        if (keys['KeyS']) {
             camera.position.elements[1] -= ladderSpeed * deltaTime;
         }
         
@@ -348,30 +348,29 @@ function processInput(deltaTime) {
         }
         
         collisionHandler.enabled = originalCollisionState;
-        
     } else {
         // Normal movement
         if (isOnLadder) {
             isOnLadder = false;
         }
         
-        if (keys['w'] || keys['W']) {
+        if (keys['KeyW']) {
             camera.processKeyboard('FORWARD', deltaTime);
         }
-        if (keys['s'] || keys['S']) {
+        if (keys['KeyS']) {
             camera.processKeyboard('BACKWARD', deltaTime);
         }
-        if (keys['a'] || keys['A']) {
+        if (keys['KeyA']) {
             camera.processKeyboard('LEFT', deltaTime);
         }
-        if (keys['d'] || keys['D']) {
+        if (keys['KeyD']) {
             camera.processKeyboard('RIGHT', deltaTime);
         }
         
-        if (keys['q'] || keys['Q']) {
+        if (keys['KeyQ']) {
             camera.processKeyboardRotation('LEFT');
         }
-        if (keys['e'] || keys['E']) {
+        if (keys['KeyE']) {
             camera.processKeyboardRotation('RIGHT');
         }
     }
@@ -489,6 +488,21 @@ function renderAssignment4Objects() {
         testSphere.render(gl, program, camera.viewMatrix, camera.projectionMatrix, 0.2, lightingSystem);
     }
 }
+
+// Add this function to help debug key issues
+function resetKeyStates() {
+    keys = {};
+    console.log('Key states reset');
+}
+
+// Add this to your window focus/blur events
+window.addEventListener('blur', function() {
+    resetKeyStates();
+});
+
+window.addEventListener('focus', function() {
+    resetKeyStates();
+});
 
 // Start the application
 window.onload = init;
