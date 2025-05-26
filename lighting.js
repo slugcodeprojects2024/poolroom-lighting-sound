@@ -20,16 +20,21 @@ export class LightingSystem {
         this.pointLightSpeed = 2.0;   // Adjustable speed
         this.pointLightRadius = 8.0;  // Movement radius
         
-        // Sun-based spot light properties (using your existing sky texture)
-        this.sunPosition = [16, 45, 16]; // High in sky, matching your texture
+        // Sun-based spot light properties - adjusted for realistic lighting
+        this.sunPosition = [16, 60, 16]; // Higher up to avoid bleeding through
         this.spotLightPos = this.sunPosition.slice();
         this.spotLightDir = [0, -1, 0]; // Points straight down from sun
-        this.spotLightCutoff = Math.cos(Math.PI / 6); // 30 degree cone
-        this.sunColor = [1.0, 0.95, 0.8]; // Warm sunlight
+        this.spotLightCutoff = Math.cos(Math.PI / 8); // Wider 22.5 degree cone for more coverage
+        this.sunColor = [2.5, 2.0, 1.5]; // Much brighter sun for realistic daylight
         
-        // Sun movement (optional)
+        // Enhanced sun movement (more noticeable)
         this.sunMovementEnabled = true;
-        this.sunMovementSpeed = 0.05;
+        this.sunMovementSpeed = 0.15; // Slower, more realistic
+        this.sunMovementRadius = 20.0; // Larger movement radius
+        
+        // Ambient lighting control
+        this.ambientStrength = 0.15; // Lower ambient when sun is active
+        this.baseAmbientStrength = 0.4; // Higher base ambient when no sun
         
         // Light markers
         this.lightMarker = null;
@@ -62,7 +67,6 @@ export class LightingSystem {
             this.pointLightPos[0] = 16 + Math.cos(this.lightAnimationTime) * this.pointLightRadius;
             this.pointLightPos[2] = 16 + Math.sin(this.lightAnimationTime) * this.pointLightRadius;
         }
-        // If not moving, pointLightPos stays at its current position
         
         // Update point light marker
         if (this.lightMarker) {
@@ -75,15 +79,26 @@ export class LightingSystem {
             this.lightMarker.modelMatrix.scale(0.3, 0.3, 0.3);
         }
         
-        // Optional: Slowly move sun across sky
+        // Enhanced sun movement - keep it high to avoid bleeding through ceiling
         if (this.sunMovementEnabled) {
-            const sunRadius = 10;
-            this.sunPosition[0] = 16 + Math.cos(this.lightAnimationTime * this.sunMovementSpeed) * sunRadius;
-            this.sunPosition[2] = 16 + Math.sin(this.lightAnimationTime * this.sunMovementSpeed) * sunRadius;
+            // Move sun in a wider arc across the sky, but keep it high
+            const sunAngle = this.lightAnimationTime * this.sunMovementSpeed;
+            this.sunPosition[0] = 16 + Math.cos(sunAngle) * this.sunMovementRadius;
+            this.sunPosition[2] = 16 + Math.sin(sunAngle) * this.sunMovementRadius;
+            
+            // Keep sun high above ceiling (ceiling is at y=5, so keep sun above y=50)
+            this.sunPosition[1] = 60 + Math.sin(sunAngle * 0.3) * 10; // Vary between 50-70
+            
             this.spotLightPos = this.sunPosition.slice();
+            
+            // Update sun color based on position (warmer when lower)
+            const heightFactor = (this.sunPosition[1] - 50) / 20; // Normalize height variation
+            this.sunColor[0] = 2.5 + (1 - heightFactor) * 0.5; // More red when lower
+            this.sunColor[1] = 2.0;
+            this.sunColor[2] = 1.5 + heightFactor * 0.3; // More blue when higher
         }
         
-        // Update sun marker with glow effect
+        // Enhanced sun marker with more dramatic glow effect
         if (this.spotLightMarker) {
             this.spotLightMarker.modelMatrix.setIdentity();
             this.spotLightMarker.modelMatrix.setTranslate(
@@ -92,8 +107,10 @@ export class LightingSystem {
                 this.sunPosition[2]
             );
             
-            // Pulsing glow effect
-            const glowScale = 2.5 + 0.5 * Math.sin(this.lightAnimationTime * 2);
+            // More dramatic pulsing glow effect with corona
+            const pulseBase = 6.0; // Even larger base size since it's higher up
+            const pulseAmount = 2.0; // More dramatic pulsing
+            const glowScale = pulseBase + pulseAmount * Math.sin(this.lightAnimationTime * 1.5);
             this.spotLightMarker.modelMatrix.scale(glowScale, glowScale, glowScale);
         }
     }
@@ -112,20 +129,27 @@ export class LightingSystem {
         gl.uniform1i(u_pointLightEnabled, this.pointLightEnabled);
         gl.uniform1i(u_spotLightEnabled, this.spotLightEnabled);
         
+        // Dynamic ambient lighting based on sun state
+        const currentAmbient = this.spotLightEnabled ? this.ambientStrength : this.baseAmbientStrength;
+        const u_AmbientStrength = gl.getUniformLocation(program, 'u_AmbientStrength');
+        gl.uniform1f(u_AmbientStrength, currentAmbient);
+        
         // Point light properties
         const u_LightPos = gl.getUniformLocation(program, 'u_LightPos');
         const u_LightColor = gl.getUniformLocation(program, 'u_LightColor');
         gl.uniform3fv(u_LightPos, this.pointLightPos);
         gl.uniform3fv(u_LightColor, this.lightColor);
         
-        // Sun-based spot light properties
+        // Enhanced sun-based spot light properties
         const u_SpotLightPos = gl.getUniformLocation(program, 'u_SpotLightPos');
         const u_SpotLightDir = gl.getUniformLocation(program, 'u_SpotLightDir');
         const u_SpotLightCutoff = gl.getUniformLocation(program, 'u_SpotLightCutoff');
+        const u_SunColor = gl.getUniformLocation(program, 'u_SunColor');
         
         gl.uniform3fv(u_SpotLightPos, this.spotLightPos);
         gl.uniform3fv(u_SpotLightDir, this.spotLightDir);
         gl.uniform1f(u_SpotLightCutoff, this.spotLightCutoff);
+        gl.uniform3fv(u_SunColor, this.sunColor);
         
         // Camera position for specular calculations
         const u_CameraPos = gl.getUniformLocation(program, 'u_CameraPos');
@@ -288,15 +312,26 @@ export class LightingSystem {
             this.lightMarker.render(gl, program, camera.viewMatrix, camera.projectionMatrix, 0.0);
         }
         
-        // Sun marker (bright golden)
+        // Enhanced sun marker (bright golden with corona effect)
         if (this.spotLightMarker && this.spotLightEnabled) {
             const u_baseColor = gl.getUniformLocation(program, 'u_baseColor');
-            gl.uniform4f(u_baseColor, 1.0, 0.9, 0.4, 1.0);
+            
+            // Render sun with bright golden color and emission-like effect
+            gl.uniform4f(u_baseColor, 1.5, 1.2, 0.6, 0.9); // Bright golden with slight transparency
             
             const u_texColorWeight = gl.getUniformLocation(program, 'u_texColorWeight');
             gl.uniform1f(u_texColorWeight, 0.0);
             
+            // Disable depth testing temporarily for glow effect
+            gl.disable(gl.DEPTH_TEST);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // Additive blending for glow
+            
             this.spotLightMarker.render(gl, program, camera.viewMatrix, camera.projectionMatrix, 0.0);
+            
+            // Restore normal rendering state
+            gl.enable(gl.DEPTH_TEST);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         }
     }
 }
