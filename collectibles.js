@@ -13,7 +13,7 @@ export class CollectibleSystem {
         this.collectibleDistance = 2.0; // How close player needs to be
         this.rotationSpeed = 1.0; // How fast they rotate
         this.bobSpeed = 2.0; // How fast they bob up and down
-        this.bobHeight = 0.3; // How much they bob
+        this.bobHeight = 0.1; // Reduced from 0.3 to 0.1 for smaller models
         this.time = 0;
         
         // Create collectibles
@@ -27,12 +27,12 @@ export class CollectibleSystem {
     createCollectibles() {
         const collectibleData = [
             // Format: [x, y, z, modelPath, scale, color]
-            [8, 1.5, 8, 'models/benchy.obj', 0.3, [0.8, 0.2, 0.2]], // Red teapot
-            [24, 1.5, 8, 'models/bunny.obj', 0.5, [0.2, 0.8, 0.2]], // Green bunny
-            [8, 1.5, 24, 'models/dragon.obj', 0.4, [0.2, 0.2, 0.8]], // Blue dragon
-            [24, 1.5, 24, 'models/head.obj', 0.6, [0.8, 0.8, 0.2]], // Yellow cube
-            [16, 1.5, 6, 'models/teapot.obj', 0.4, [0.8, 0.2, 0.8]], // Purple sphere
-            [16, 1.5, 26, 'models/trumpet.obj', 0.5, [0.2, 0.8, 0.8]], // Cyan cow
+            [8, 1.5, 8, 'models/benchy.obj', 0.1, [0.8, 0.2, 0.2]], // Red benchy - increased from 0.05
+            [24, 1.5, 8, 'models/bunny.obj', 0.08, [0.2, 0.8, 0.2]], // Green bunny - good size
+            [8, 1.5, 24, 'models/dragon.obj', 0.06, [0.2, 0.2, 0.8]], // Blue dragon - good size
+            [24, 1.5, 24, 'models/head.obj', 0.03, [0.8, 0.8, 0.2]], // Yellow head - reduced from 0.1 to 0.03
+            [16, 1.5, 6, 'models/teapot.obj', 0.07, [0.8, 0.2, 0.8]], // Purple teapot - good size
+            [16, 1.5, 26, 'models/trumpet.obj', 0.03, [0.2, 0.8, 0.8]], // Cyan trumpet - reduced from 0.08 to 0.03
         ];
         
         collectibleData.forEach((data, index) => {
@@ -50,9 +50,9 @@ export class CollectibleSystem {
                 glowIntensity: 1.0
             };
             
-            // Set initial transform
+            // Set initial transform with the smaller scale
             collectible.model.setPosition(x, y, z);
-            collectible.model.setScale(scale, scale, scale); // Initial scale
+            collectible.model.setScale(scale, scale, scale);
             collectible.model.setColor(...color, 1.0);
             
             this.collectibles.push(collectible);
