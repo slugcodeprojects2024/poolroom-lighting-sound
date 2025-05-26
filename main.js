@@ -3,8 +3,8 @@ import { Camera } from './camera.js';
 import { InputManager } from './InputManager.js';
 import { CollisionHandler } from './collision.js';
 import { PoolRoom } from './poolRoom.js';
-import { Player } from './Player.js';
-// main.js - Main application entry point with collision detection and sprint
+
+// Main application entry point with collision detection and sprint
 let gl;
 let program;
 let camera;
@@ -16,13 +16,14 @@ let mouseX = 0, mouseY = 0;
 let mouseDown = false;
 let canvas;
 
-// Add these variables at the top with your other global variables
+// FPS tracking variables
 let frameCount = 0;
 let fpsTime = 0;
 let fps = 0;
 
-let inputManager;
-let player;
+// Ladder climbing variables
+let isOnLadder = false;
+let ladderSpeed = 3.0;
 
 // Initialize WebGL context
 function init() {
@@ -60,6 +61,9 @@ function init() {
     // Set up event listeners
     setupEventListeners(canvas);
     
+    console.log('Game initialized with ladder climbing system');
+    console.log('Controls: WASD to move, F near ladder to climb, W/S to climb up/down');
+    
     // Start the render loop
     lastTime = performance.now();
     render();
@@ -78,14 +82,70 @@ function initShaders() {
     gl.useProgram(program);
 }
 
+// Create shader program
+function createProgram(gl, vertexSource, fragmentSource) {
+    const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexSource);
+    const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+    
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error('Error linking program:', gl.getProgramInfoLog(program));
+        return null;
+    }
+    
+    return program;
+}
+
+function createShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error('Error compiling shader:', gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+    }
+    
+    return shader;
+}
+
+// Check for ladder proximity and update UI
+function checkLadderProximity() {
+    const cameraPos = camera.position.elements;
+    const playerPos = [cameraPos[0], cameraPos[1] - 1.6, cameraPos[2]]; // Adjust for eye height
+    const playerDims = [0.8, 1.8, 0.8];
+    
+    const nearLadder = poolRoom.getLadderAt(playerPos, playerDims);
+    
+    // Update UI hints
+    if (nearLadder && !isOnLadder) {
+        if (window.showLadderHint) window.showLadderHint();
+    } else {
+        if (window.hideLadderHint) window.hideLadderHint();
+    }
+    
+    if (isOnLadder) {
+        if (window.showClimbingIndicator) window.showClimbingIndicator();
+    } else {
+        if (window.hideClimbingIndicator) window.hideClimbingIndicator();
+    }
+    
+    return nearLadder;
+}
+
 // Handle keyboard and mouse events
 function setupEventListeners(canvas) {
     // Keyboard events
     document.addEventListener('keydown', function(event) {
         keys[event.key] = true;
         
-        // Handle jump with spacebar
-        if (event.key === ' ') {
+        // Handle jump with spacebar (only when not climbing)
+        if (event.key === ' ' && !isOnLadder) {
             camera.jump();
         }
         
@@ -97,6 +157,29 @@ function setupEventListeners(canvas) {
         // Toggle collision with 'C' key
         if (event.key === 'c' || event.key === 'C') {
             collisionHandler.toggleCollision();
+        }
+        
+        // Ladder climbing toggle with F key
+        if (event.key === 'f' || event.key === 'F') {
+            const cameraPos = camera.position.elements;
+            const playerPos = [cameraPos[0], cameraPos[1] - 1.6, cameraPos[2]];
+            const playerDims = [0.8, 1.8, 0.8];
+            
+            const nearLadder = poolRoom.getLadderAt(playerPos, playerDims);
+            
+            if (nearLadder) {
+                isOnLadder = !isOnLadder;
+                
+                if (isOnLadder) {
+                    // Snap to ladder center when starting to climb
+                    const ladderMatrix = nearLadder.modelMatrix.elements;
+                    camera.position.elements[0] = ladderMatrix[12];
+                    camera.position.elements[2] = ladderMatrix[14];
+                    console.log('Started climbing ladder');
+                } else {
+                    console.log('Stopped climbing ladder');
+                }
+            }
         }
     });
     
@@ -137,20 +220,35 @@ function setupEventListeners(canvas) {
         }
     });
 
-    // Add dedicated click handler
+    // Add dedicated click handler for ladder interaction
     document.addEventListener('click', function(event) {
         // Only process when pointer is locked
         if (document.pointerLockElement === canvas || 
             document.mozPointerLockElement === canvas) {
-            // Handle any click-related functionality here if needed
+            
+            const cameraPos = camera.position.elements;
+            const playerPos = [cameraPos[0], cameraPos[1] - 1.6, cameraPos[2]];
+            const playerDims = [0.8, 1.8, 0.8];
+            
+            const nearLadder = poolRoom.getLadderAt(playerPos, playerDims);
+            
+            if (nearLadder) {
+                isOnLadder = !isOnLadder;
+                
+                if (isOnLadder) {
+                    const ladderMatrix = nearLadder.modelMatrix.elements;
+                    camera.position.elements[0] = ladderMatrix[12];
+                    camera.position.elements[2] = ladderMatrix[14];
+                    console.log('Started climbing ladder (click)');
+                } else {
+                    console.log('Stopped climbing ladder (click)');
+                }
+            }
         }
     });
 
     document.addEventListener('mouseup', function() {
         mouseDown = false;
-        
-        // Don't exit pointer lock when releasing mouse button
-        // This allows for continuous camera control
     });
 
     // Pointer lock change event
@@ -200,26 +298,69 @@ function setupEventListeners(canvas) {
 
 // Process keyboard input
 function processInput(deltaTime) {
-    // WASD keys for movement
-    if (keys['w'] || keys['W']) {
-        camera.processKeyboard('FORWARD', deltaTime);
-    }
-    if (keys['s'] || keys['S']) {
-        camera.processKeyboard('BACKWARD', deltaTime);
-    }
-    if (keys['a'] || keys['A']) {
-        camera.processKeyboard('LEFT', deltaTime);
-    }
-    if (keys['d'] || keys['D']) {
-        camera.processKeyboard('RIGHT', deltaTime);
-    }
+    const nearLadder = checkLadderProximity();
     
-    // QE keys for camera rotation
-    if (keys['q'] || keys['Q']) {
-        camera.processKeyboardRotation('LEFT');
-    }
-    if (keys['e'] || keys['E']) {
-        camera.processKeyboardRotation('RIGHT');
+    if (isOnLadder && nearLadder) {
+        // LADDER CLIMBING MODE
+        
+        // Override gravity/physics while on ladder
+        if (camera.velocity && camera.velocity.elements) {
+            camera.velocity.elements[1] = 0; // Stop falling
+        }
+        
+        // Vertical movement only
+        if (keys['w'] || keys['W']) {
+            camera.position.elements[1] += ladderSpeed * deltaTime;
+        }
+        if (keys['s'] || keys['S']) {
+            camera.position.elements[1] -= ladderSpeed * deltaTime;
+        }
+        
+        // Keep player centered on ladder
+        const ladderMatrix = nearLadder.modelMatrix.elements;
+        camera.position.elements[0] = ladderMatrix[12];
+        camera.position.elements[2] = ladderMatrix[14];
+        
+        // Height limits
+        if (camera.position.elements[1] < 0.6) {
+            camera.position.elements[1] = 0.6;
+        }
+        if (camera.position.elements[1] > 6.0) {
+            camera.position.elements[1] = 6.0;
+        }
+        
+        // Update camera vectors
+        if (camera.updateCameraVectors) {
+            camera.updateCameraVectors();
+        }
+        
+    } else {
+        // NORMAL MOVEMENT MODE
+        if (isOnLadder) {
+            isOnLadder = false; // Lost ladder contact
+        }
+        
+        // WASD keys for movement
+        if (keys['w'] || keys['W']) {
+            camera.processKeyboard('FORWARD', deltaTime);
+        }
+        if (keys['s'] || keys['S']) {
+            camera.processKeyboard('BACKWARD', deltaTime);
+        }
+        if (keys['a'] || keys['A']) {
+            camera.processKeyboard('LEFT', deltaTime);
+        }
+        if (keys['d'] || keys['D']) {
+            camera.processKeyboard('RIGHT', deltaTime);
+        }
+        
+        // QE keys for camera rotation
+        if (keys['q'] || keys['Q']) {
+            camera.processKeyboardRotation('LEFT');
+        }
+        if (keys['e'] || keys['E']) {
+            camera.processKeyboardRotation('RIGHT');
+        }
     }
 }
 
@@ -261,8 +402,20 @@ function render() {
     poolRoom.render(gl, program, camera);
     
     // Update status display
-    const statusText = `FPS: ${fps} | Collision: ${collisionHandler.collisionEnabled ? 'ON' : 'OFF'}`;
+    const statusText = `
+        FPS: ${fps} | Collision: ${collisionHandler.enabled ? 'ON' : 'OFF'}<br>
+        Position: ${camera.position.elements.map(v => v.toFixed(1)).join(', ')}<br>
+        Climbing: ${isOnLadder ? 'YES' : 'NO'}<br>
+        Controls: WASD - Move | Mouse - Look | Space - Jump<br>
+        Click or F near ladder to climb | W/S to climb up/down while climbing
+    `;
     document.getElementById('status').innerHTML = statusText;
+    
+    // Update FPS counter
+    const fpsCounter = document.getElementById('fps-counter');
+    if (fpsCounter) {
+        fpsCounter.textContent = `FPS: ${fps}`;
+    }
     
     requestAnimationFrame(render);
 }

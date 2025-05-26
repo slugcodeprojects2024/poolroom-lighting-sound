@@ -26,7 +26,7 @@ export class PoolRoom {
         
         // Initialize textures
         this.textures = {};
-        this.createEnhancedWaterTexture();  // Create water texture first
+        this.createEnhancedWaterTexture();  // Create water texture first 
         this.createTextures();              // Then create other textures
         
         // Create ground sections around the pool with proper positioning
@@ -621,36 +621,40 @@ export class PoolRoom {
     // Add this method to your PoolRoom class
     getLadderAt(playerPosition, playerDimensions) {
         const px = playerPosition[0];
-        const py = playerPosition[1]; // Assuming playerPosition is base of player
+        const py = playerPosition[1]; 
         const pz = playerPosition[2];
         const pWidth = playerDimensions[0];
         const pHeight = playerDimensions[1];
         const pDepth = playerDimensions[2];
 
-        // Player's AABB (center is at py + pHeight/2 if playerPosition is base)
-        const playerCenterY = py + pHeight / 2;
+        // Player's AABB (Axis-Aligned Bounding Box)
         const playerMinX = px - pWidth / 2;
         const playerMaxX = px + pWidth / 2;
-        const playerMinY = playerCenterY - pHeight / 2;
-        const playerMaxY = playerCenterY + pHeight / 2;
+        const playerMinY = py;
+        const playerMaxY = py + pHeight;
         const playerMinZ = pz - pDepth / 2;
         const playerMaxZ = pz + pDepth / 2;
+
+        // Find the closest ladder within interaction range
+        let closestLadder = null;
+        let closestDistance = Infinity;
+        const maxInteractionDistance = 1.5; // Maximum distance to interact with ladder
 
         for (const cube of this.cubes) {
             if (cube.type === 'ladder') {
                 const m = cube.modelMatrix.elements;
-                // Center of the ladder segment
+                
+                // Ladder center position
                 const ladderCenterX = m[12];
                 const ladderCenterY = m[13];
                 const ladderCenterZ = m[14];
                 
-                // Dimensions of the ladder segment (from its scale)
-                // Assuming no complex rotations, scale is directly from matrix diagonal
-                const ladderWidth = m[0];  // Scale X
-                const ladderHeight = m[5]; // Scale Y
-                const ladderDepth = m[10]; // Scale Z
+                // Ladder dimensions (assuming scale is directly from matrix diagonal)
+                const ladderWidth = Math.abs(m[0]);
+                const ladderHeight = Math.abs(m[5]);
+                const ladderDepth = Math.abs(m[10]);
 
-                // Ladder segment's AABB
+                // Ladder's AABB
                 const ladderMinX = ladderCenterX - ladderWidth / 2;
                 const ladderMaxX = ladderCenterX + ladderWidth / 2;
                 const ladderMinY = ladderCenterY - ladderHeight / 2;
@@ -658,19 +662,35 @@ export class PoolRoom {
                 const ladderMinZ = ladderCenterZ - ladderDepth / 2;
                 const ladderMaxZ = ladderCenterZ + ladderDepth / 2;
 
-                // AABB intersection test
-                const intersects = (
-                    playerMinX <= ladderMaxX && playerMaxX >= ladderMinX &&
-                    playerMinY <= ladderMaxY && playerMaxY >= ladderMinY &&
-                    playerMinZ <= ladderMaxZ && playerMaxZ >= ladderMinZ
+                // Check for AABB intersection (player touching ladder)
+                const intersectsX = playerMinX <= ladderMaxX && playerMaxX >= ladderMinX;
+                const intersectsY = playerMinY <= ladderMaxY && playerMaxY >= ladderMinY;
+                const intersectsZ = playerMinZ <= ladderMaxZ && playerMaxZ >= ladderMinZ;
+
+                const intersects = intersectsX && intersectsY && intersectsZ;
+
+                // Also check proximity even if not directly intersecting
+                const distance = Math.sqrt(
+                    Math.pow(px - ladderCenterX, 2) + 
+                    Math.pow(py + pHeight/2 - ladderCenterY, 2) + 
+                    Math.pow(pz - ladderCenterZ, 2)
                 );
 
-                if (intersects) {
-                    return cube; // Return the ladder cube being intersected
+                if (intersects || distance < maxInteractionDistance) {
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestLadder = cube;
+                    }
                 }
             }
         }
-        return null; // No ladder intersection
+
+        // Debug logging
+        if (closestLadder) {
+            console.log(`Found ladder at distance: ${closestDistance.toFixed(2)}`);
+        }
+
+        return closestLadder;
     }
 
     // Render the entire poolroom
