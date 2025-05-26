@@ -159,6 +159,7 @@ class Model {
         this.filePath = filePath;
         this.color = [1.0, 1.0, 1.0, 1.0]; // Default white
         this.modelMatrix = new Matrix4();
+        this.modelMatrix.setIdentity();
         
         this.vertexBuffer = null;
         this.normalBuffer = null;
@@ -208,20 +209,36 @@ class Model {
     
     // Set position
     setPosition(x, y, z) {
-        this.modelMatrix.setTranslate(x, y, z);
-        return this;
+        this.position = [x, y, z];
+        this.updateModelMatrix();
     }
     
     // Set scale
     setScale(sx, sy, sz) {
-        this.modelMatrix.scale(sx, sy, sz);
-        return this;
+        this.scale = [sx, sy, sz];
+        this.updateModelMatrix();
     }
     
     // Set rotation
-    setRotation(angle, x, y, z) {
-        this.modelMatrix.rotate(angle, x, y, z);
-        return this;
+    setRotation(angleX, angleY, angleZ) {
+        // Create a new identity matrix and apply rotations in order
+        const rotationMatrix = new Matrix4();
+        rotationMatrix.setIdentity();
+        
+        // Apply rotations - note the parameter order for Matrix4.rotate is (angle, x, y, z)
+        if (angleX !== 0) {
+            rotationMatrix.rotate(angleX, 1, 0, 0);
+        }
+        if (angleY !== 0) {
+            rotationMatrix.rotate(angleY, 0, 1, 0);
+        }
+        if (angleZ !== 0) {
+            rotationMatrix.rotate(angleZ, 0, 0, 1);
+        }
+        
+        // Store the rotation for later use in transformation chain
+        this.rotationMatrix = rotationMatrix;
+        this.updateModelMatrix();
     }
     
     // Set color
@@ -283,6 +300,26 @@ class Model {
         
         // Draw the model
         gl.drawArrays(gl.TRIANGLES, 0, this.numVertices);
+    }
+    
+    updateModelMatrix() {
+        // Rebuild the model matrix with proper TRS order
+        this.modelMatrix.setIdentity();
+        
+        // Apply translation
+        if (this.position) {
+            this.modelMatrix.translate(this.position[0], this.position[1], this.position[2]);
+        }
+        
+        // Apply rotation
+        if (this.rotationMatrix) {
+            this.modelMatrix.multiply(this.rotationMatrix);
+        }
+        
+        // Apply scale
+        if (this.scale) {
+            this.modelMatrix.scale(this.scale[0], this.scale[1], this.scale[2]);
+        }
     }
 }
 

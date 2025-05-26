@@ -254,7 +254,6 @@ export class PoolRoomWithLighting {
         });
         this.loadTextureFromFile('textures/skybox_render.jpg', 'skyboxWall');
         this.loadTextureFromFile('textures/stone_bricks.png', 'poolWall');
-        this.loadTextureFromFile('textures/ladder_texture.png', 'ladder');
     }
 
     // Create placeholder texture (same implementation)

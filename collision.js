@@ -86,7 +86,7 @@ export class CollisionHandler {
                 
                 // Debug logging for ceiling cubes
                 if (cube.type === 'ceiling') {
-                    console.log(`Added ceiling collision at Y: ${posY}, bounds: ${posY - scaleY/2} to ${posY + scaleY/2}`);
+                    // console.log(`Added ceiling collision at Y: ${posY}, bounds: ${posY - scaleY/2} to ${posY + scaleY/2}`);
                 }
             }
         }
@@ -369,5 +369,25 @@ export class CollisionHandler {
             }
         }
         return false;
+    }
+}
+
+function addCeilingCollisions() {
+    // ... existing code ...
+    
+    // Add a check to prevent duplicate ceiling collisions
+    const existingCeilings = new Set();
+    
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+        for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+            const key = `${ceilingY}-${x}-${z}`;
+            if (!existingCeilings.has(key)) {
+                existingCeilings.add(key);
+                const box = new CollisionBox(x, ceilingY, z, x + 1, ceilingY + 0.1, z + 1, 'ceiling');
+                collisionBoxes.push(box);
+                // Remove or comment out this console.log to stop spam
+                // console.log(`Added ceiling collision at Y: ${ceilingY}, bounds: ${x} to ${x + 1}`);
+            }
+        }
     }
 }

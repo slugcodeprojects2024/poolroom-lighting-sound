@@ -27,12 +27,12 @@ export class CollectibleSystem {
     createCollectibles() {
         const collectibleData = [
             // Format: [x, y, z, modelPath, scale, color]
-            [8, 1.5, 8, 'models/teapot.obj', 0.3, [0.8, 0.2, 0.2]], // Red teapot
+            [8, 1.5, 8, 'models/benchy.obj', 0.3, [0.8, 0.2, 0.2]], // Red teapot
             [24, 1.5, 8, 'models/bunny.obj', 0.5, [0.2, 0.8, 0.2]], // Green bunny
             [8, 1.5, 24, 'models/dragon.obj', 0.4, [0.2, 0.2, 0.8]], // Blue dragon
-            [24, 1.5, 24, 'models/cube.obj', 0.6, [0.8, 0.8, 0.2]], // Yellow cube
-            [16, 1.5, 6, 'models/sphere.obj', 0.4, [0.8, 0.2, 0.8]], // Purple sphere
-            [16, 1.5, 26, 'models/cow.obj', 0.5, [0.2, 0.8, 0.8]], // Cyan cow
+            [24, 1.5, 24, 'models/head.obj', 0.6, [0.8, 0.8, 0.2]], // Yellow cube
+            [16, 1.5, 6, 'models/teapot.obj', 0.4, [0.8, 0.2, 0.8]], // Purple sphere
+            [16, 1.5, 26, 'models/trumpet.obj', 0.5, [0.2, 0.8, 0.8]], // Cyan cow
         ];
         
         collectibleData.forEach((data, index) => {
@@ -52,7 +52,7 @@ export class CollectibleSystem {
             
             // Set initial transform
             collectible.model.setPosition(x, y, z);
-            collectible.model.setScale(scale, scale, scale);
+            collectible.model.setScale(scale, scale, scale); // Initial scale
             collectible.model.setColor(...color, 1.0);
             
             this.collectibles.push(collectible);
@@ -69,36 +69,50 @@ export class CollectibleSystem {
         this.collectibles.forEach(collectible => {
             if (collectible.collected) return;
             
+            // Skip if model isn't loaded yet or modelMatrix isn't ready
+            if (!collectible.model || !collectible.model.modelMatrix) {
+                return;
+            }
+            
             // Rotation animation
             collectible.rotationY += this.rotationSpeed * deltaTime;
             
             // Bobbing animation
             const bobOffset = Math.sin(this.time * this.bobSpeed + collectible.id) * this.bobHeight;
-            collectible.position[1] = collectible.baseY + bobOffset;
+            // Update the y-position directly for translation
+            const currentY = collectible.baseY + bobOffset;
             
             // Glowing effect
             collectible.glowIntensity = 0.8 + 0.2 * Math.sin(this.time * 3 + collectible.id);
             
-            // Update model transform
-            collectible.model.modelMatrix.setIdentity();
-            collectible.model.modelMatrix.setTranslate(
+            // Update model transform using Model's own methods for T * R * S transformation
+            // 1. Model.setPosition() calls modelMatrix.setTranslate(), effectively setting M = T
+            collectible.model.setPosition(
                 collectible.position[0],
-                collectible.position[1],
+                currentY,
                 collectible.position[2]
             );
-            collectible.model.modelMatrix.rotate(collectible.rotationY * 180 / Math.PI, 0, 1, 0);
-            collectible.model.modelMatrix.scale(collectible.scale, collectible.scale, collectible.scale);
+
+            // 2. Model.setScale() calls modelMatrix.scale(), effectively M = M * S (so M = T * R * S)
+            collectible.model.setScale(collectible.scale, collectible.scale, collectible.scale);
             
             // Check for collection
-            this.checkCollection(collectible, playerPosition);
+            // Note: checkCollection uses collectible.position, which doesn't include the bobOffset for its y.
+            // For accurate distance checking, we should use the model's actual animated position.
+            const animatedPosition = [
+                collectible.position[0],
+                currentY,
+                collectible.position[2]
+            ];
+            this.checkCollection(collectible, playerPosition, animatedPosition);
         });
     }
     
     // Check if player is close enough to collect
-    checkCollection(collectible, playerPosition) {
-        const dx = playerPosition[0] - collectible.position[0];
-        const dy = playerPosition[1] - collectible.position[1];
-        const dz = playerPosition[2] - collectible.position[2];
+    checkCollection(collectible, playerPosition, animatedCollectiblePosition) {
+        const dx = playerPosition[0] - animatedCollectiblePosition[0];
+        const dy = playerPosition[1] - animatedCollectiblePosition[1];
+        const dz = playerPosition[2] - animatedCollectiblePosition[2];
         const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
         
         if (distance < this.collectibleDistance) {
@@ -115,7 +129,7 @@ export class CollectibleSystem {
         
         console.log(`Collected item ${collectible.id + 1}! (${this.collectedCount}/${this.totalCount})`);
         
-        // Play collection effect (simple console log for now)
+        // Play collection effect
         this.showCollectionEffect(collectible);
         
         // Update UI
@@ -151,7 +165,9 @@ export class CollectibleSystem {
         
         // Remove after 2 seconds
         setTimeout(() => {
-            document.body.removeChild(effectDiv);
+            if (document.body.contains(effectDiv)) {
+                document.body.removeChild(effectDiv);
+            }
         }, 2000);
     }
     
@@ -183,7 +199,9 @@ export class CollectibleSystem {
         
         // Remove after 5 seconds
         setTimeout(() => {
-            document.body.removeChild(congratsDiv);
+            if (document.body.contains(congratsDiv)) {
+                document.body.removeChild(congratsDiv);
+            }
         }, 5000);
         
         console.log('🎉 All collectibles found! Assignment 4 requirements fulfilled!');
@@ -227,6 +245,11 @@ export class CollectibleSystem {
         this.collectibles.forEach(collectible => {
             if (collectible.collected) return;
             
+            // Skip if model isn't loaded yet
+            if (!collectible.model || !collectible.model.modelMatrix || !collectible.model.vertexBuffer) {
+                return;
+            }
+            
             // Enhanced glow effect for collectibles
             const u_baseColor = gl.getUniformLocation(program, 'u_baseColor');
             gl.uniform4f(u_baseColor, 
@@ -245,21 +268,98 @@ export class CollectibleSystem {
     getNearestCollectible(playerPosition) {
         let nearestDistance = Infinity;
         let nearestCollectible = null;
+        let actualNearestY = 0; // Store the Y used for distance calculation
         
         this.collectibles.forEach(collectible => {
             if (collectible.collected) return;
+
+            // Calculate current animated Y for distance check
+            const bobOffset = Math.sin(this.time * this.bobSpeed + collectible.id) * this.bobHeight;
+            const currentY = collectible.baseY + bobOffset;
             
             const dx = playerPosition[0] - collectible.position[0];
-            const dy = playerPosition[1] - collectible.position[1];
+            const dy = playerPosition[1] - currentY;
             const dz = playerPosition[2] - collectible.position[2];
             const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
             
             if (distance < nearestDistance) {
                 nearestDistance = distance;
                 nearestCollectible = collectible;
+                actualNearestY = currentY; // Store this Y
             }
         });
         
-        return { collectible: nearestCollectible, distance: nearestDistance };
+        // Return the collectible and its distance, potentially with its animated position
+        if (nearestCollectible) {
+            return { 
+                collectible: nearestCollectible, 
+                distance: nearestDistance,
+                animatedPosition: [nearestCollectible.position[0], actualNearestY, nearestCollectible.position[2]]
+            };
+        }
+        return { collectible: null, distance: Infinity };
+    }
+
+    // Set rotation
+    setRotation(angleX, angleY, angleZ) {
+        // Store rotation values for use in updateModelMatrix
+        this.rotation = [angleX, angleY, angleZ];
+        this.updateModelMatrix();
+    }
+
+    setPosition(x, y, z) {
+        this.position = [x, y, z];
+        this.updateModelMatrix();
+    }
+
+    setScale(sx, sy, sz) {
+        this.scale = [sx, sy, sz];
+        this.updateModelMatrix();
+    }
+
+    updateModelMatrix() {
+        // Rebuild the model matrix with proper TRS order
+        this.modelMatrix.setIdentity();
+        
+        // Apply translation
+        if (this.position) {
+            this.modelMatrix.translate(this.position[0], this.position[1], this.position[2]);
+        }
+        
+        // Apply rotations using available Matrix4 methods
+        if (this.rotation) {
+            // Try different rotation method names that might exist
+            if (typeof this.modelMatrix.rotateX === 'function') {
+                if (this.rotation[0] !== 0) this.modelMatrix.rotateX(this.rotation[0]);
+                if (this.rotation[1] !== 0) this.modelMatrix.rotateY(this.rotation[1]);
+                if (this.rotation[2] !== 0) this.modelMatrix.rotateZ(this.rotation[2]);
+            } else if (typeof this.modelMatrix.setRotate === 'function') {
+                // Some Matrix4 implementations use setRotate
+                if (this.rotation[1] !== 0) {
+                    const tempMatrix = new Matrix4();
+                    tempMatrix.setRotate(this.rotation[1], 0, 1, 0);
+                    this.modelMatrix.multiply(tempMatrix);
+                }
+            } else {
+                // Fallback: manually create rotation matrix
+                if (this.rotation[1] !== 0) {
+                    const cos = Math.cos(this.rotation[1] * Math.PI / 180);
+                    const sin = Math.sin(this.rotation[1] * Math.PI / 180);
+                    const rotMatrix = new Matrix4();
+                    rotMatrix.elements.set([
+                        cos, 0, sin, 0,
+                        0, 1, 0, 0,
+                        -sin, 0, cos, 0,
+                        0, 0, 0, 1
+                    ]);
+                    this.modelMatrix.multiply(rotMatrix);
+                }
+            }
+        }
+        
+        // Apply scale
+        if (this.scale) {
+            this.modelMatrix.scale(this.scale[0], this.scale[1], this.scale[2]);
+        }
     }
 }
