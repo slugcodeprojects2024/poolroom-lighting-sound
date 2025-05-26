@@ -15,6 +15,11 @@ export class LightingSystem {
         this.lightMovementSpeed = 2.0;
         this.lightAnimationTime = 0;
         
+        // NEW: Point light movement controls
+        this.pointLightMoving = true; // Toggle for movement
+        this.pointLightSpeed = 2.0;   // Adjustable speed
+        this.pointLightRadius = 8.0;  // Movement radius
+        
         // Sun-based spot light properties (using your existing sky texture)
         this.sunPosition = [16, 45, 16]; // High in sky, matching your texture
         this.spotLightPos = this.sunPosition.slice();
@@ -49,15 +54,15 @@ export class LightingSystem {
     
     // Update lighting system
     update(deltaTime) {
-        // Animate point light movement (Assignment 4 requirement)
-        this.lightAnimationTime += deltaTime * this.lightMovementSpeed;
-        
-        const radius = 8;
-        const centerX = 16;
-        const centerZ = 16;
-        
-        this.pointLightPos[0] = centerX + Math.cos(this.lightAnimationTime) * radius;
-        this.pointLightPos[2] = centerZ + Math.sin(this.lightAnimationTime) * radius;
+        // Update point light animation only if movement is enabled
+        if (this.pointLightMoving) {
+            this.lightAnimationTime += deltaTime * this.pointLightSpeed;
+            
+            // Circular movement around the pool center
+            this.pointLightPos[0] = 16 + Math.cos(this.lightAnimationTime) * this.pointLightRadius;
+            this.pointLightPos[2] = 16 + Math.sin(this.lightAnimationTime) * this.pointLightRadius;
+        }
+        // If not moving, pointLightPos stays at its current position
         
         // Update point light marker
         if (this.lightMarker) {
@@ -73,8 +78,8 @@ export class LightingSystem {
         // Optional: Slowly move sun across sky
         if (this.sunMovementEnabled) {
             const sunRadius = 10;
-            this.sunPosition[0] = centerX + Math.cos(this.lightAnimationTime * this.sunMovementSpeed) * sunRadius;
-            this.sunPosition[2] = centerZ + Math.sin(this.lightAnimationTime * this.sunMovementSpeed) * sunRadius;
+            this.sunPosition[0] = 16 + Math.cos(this.lightAnimationTime * this.sunMovementSpeed) * sunRadius;
+            this.sunPosition[2] = 16 + Math.sin(this.lightAnimationTime * this.sunMovementSpeed) * sunRadius;
             this.spotLightPos = this.sunPosition.slice();
         }
         
@@ -160,11 +165,13 @@ export class LightingSystem {
                 <button id="toggle-normals" style="padding: 8px 12px; background: #2196F3; color: white; border: none; border-radius: 4px;">Toggle Normals (N)</button>
             </div>
             
-            <div style="margin: 15px 0; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px;">
-                <h4 style="margin-top: 0;">🌟 Point Light (Moving)</h4>
+            <div style="margin: 15px 0; padding: 10px; background: rgba(255,255,0,0.2); border-radius: 5px;">
+                <h4 style="margin-top: 0; color: #ffff00;">💡 Point Light (Moving)</h4>
                 <label><input type="checkbox" id="point-light-toggle" checked> Enable Point Light</label><br>
-                <label style="display: block; margin-top: 8px;">X: <input type="range" id="light-x" min="5" max="27" value="16" step="0.5" style="width: 140px;"></label>
-                <label style="display: block;">Y: <input type="range" id="light-y" min="1" max="8" value="3" step="0.1" style="width: 140px;"></label>
+                <label><input type="checkbox" id="point-light-movement" checked> Enable Movement</label><br>
+                <label style="display: block; margin-top: 8px;">Speed: <input type="range" id="point-light-speed" min="0.5" max="5.0" value="2.0" step="0.1" style="width: 140px;"></label>
+                <label style="display: block;">X: <input type="range" id="light-x" min="5" max="27" value="16" step="0.5" style="width: 140px;"></label>
+                <label style="display: block;">Y: <input type="range" id="light-y" min="1" max="8" value="3" step="0.2" style="width: 140px;"></label>
                 <label style="display: block;">Z: <input type="range" id="light-z" min="5" max="27" value="16" step="0.5" style="width: 140px;"></label>
             </div>
             
@@ -204,14 +211,28 @@ export class LightingSystem {
             this.pointLightEnabled = e.target.checked;
         });
         
+        document.getElementById('point-light-movement').addEventListener('change', (e) => {
+            this.pointLightMoving = e.target.checked;
+            console.log(`Point light movement: ${this.pointLightMoving ? 'enabled' : 'disabled'}`);
+        });
+        
+        document.getElementById('point-light-speed').addEventListener('input', (e) => {
+            this.pointLightSpeed = parseFloat(e.target.value);
+            console.log(`Point light speed: ${this.pointLightSpeed}`);
+        });
+        
         document.getElementById('light-x').addEventListener('input', (e) => {
-            this.pointLightPos[0] = parseFloat(e.target.value);
+            if (!this.pointLightMoving) {
+                this.pointLightPos[0] = parseFloat(e.target.value);
+            }
         });
         document.getElementById('light-y').addEventListener('input', (e) => {
             this.pointLightPos[1] = parseFloat(e.target.value);
         });
         document.getElementById('light-z').addEventListener('input', (e) => {
-            this.pointLightPos[2] = parseFloat(e.target.value);
+            if (!this.pointLightMoving) {
+                this.pointLightPos[2] = parseFloat(e.target.value);
+            }
         });
         
         // Sun controls
