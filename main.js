@@ -35,6 +35,9 @@ let ladderSpeed = 3.0;
 let testCube;
 let testSphere;
 
+// Add a global variable for toggling test objects visibility
+let showTestObjects = true;
+
 // Initialize WebGL context
 function init() {
     canvas = document.getElementById('webgl');
@@ -128,15 +131,17 @@ function createShader(gl, type, source) {
 
 // Create Assignment 4 required objects
 function createAssignment4Objects() {
-    // Cube with normals (Assignment 4 requirement)
-    testCube = new CubeWithNormals(gl);
-    testCube.setPosition(10, 1, 10);
-    testCube.setScale(2, 2, 2);
+    // Create sphere with same size as cube (radius 0.5 to match cube's 1x1x1 size)
+    testSphere = new Sphere(gl, 0.5, 20); // radius 0.5, 20 segments for smoothness
+    testSphere.modelMatrix.setIdentity();
+    // Position sphere between pillar rows in the pool - left side
+    testSphere.modelMatrix.translate(12, 0.5, 16); // Between left pillars
     
-    // Sphere with procedural generation (Assignment 4 requirement)
-    testSphere = new Sphere(gl, 1.0, 20);
-    testSphere.setPosition(20, 2, 10);
-    testSphere.setScale(2, 2, 2);
+    // Create cube
+    testCube = new CubeWithNormals(gl);
+    testCube.modelMatrix.setIdentity();
+    // Position cube between pillar rows in the pool - right side  
+    testCube.modelMatrix.translate(20, 0.5, 16); // Between right pillars
     
     console.log('✅ Assignment 4 objects created: Cube + Sphere with normals');
 }
@@ -202,6 +207,12 @@ function setupEventListeners(canvas) {
                     console.log('Stopped climbing ladder');
                 }
             }
+        }
+        
+        // Toggle test objects visibility with 'T' key
+        if (event.key === 't' || event.key === 'T') {
+            showTestObjects = !showTestObjects;
+            console.log(`Test objects ${showTestObjects ? 'shown' : 'hidden'}`);
         }
     });
     
@@ -442,6 +453,11 @@ function render() {
 
 // Render Assignment 4 required objects
 function renderAssignment4Objects() {
+    // Only render if test objects are enabled
+    if (!showTestObjects) {
+        return;
+    }
+    
     // Set default texture
     const u_Sampler = gl.getUniformLocation(program, 'u_Sampler');
     gl.uniform1i(u_Sampler, 0);
