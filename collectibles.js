@@ -27,16 +27,18 @@ export class CollectibleSystem {
     createCollectibles() {
         const collectibleData = [
             // Format: [x, y, z, modelPath, scale, color]
-            [8, 1.5, 8, 'models/benchy.obj', 0.1, [0.8, 0.2, 0.2]], // Red benchy - increased from 0.05
-            [24, 1.5, 8, 'models/bunny.obj', 0.08, [0.2, 0.8, 0.2]], // Green bunny - good size
-            [8, 1.5, 24, 'models/dragon.obj', 0.06, [0.2, 0.2, 0.8]], // Blue dragon - good size
-            [24, 1.5, 24, 'models/head.obj', 0.03, [0.8, 0.8, 0.2]], // Yellow head - reduced from 0.1 to 0.03
-            [16, 1.5, 6, 'models/teapot.obj', 0.07, [0.8, 0.2, 0.8]], // Purple teapot - good size
-            [16, 1.5, 26, 'models/trumpet.obj', 0.03, [0.2, 0.8, 0.8]], // Cyan trumpet - reduced from 0.08 to 0.03
+            // Positioned around the pool deck area where player can walk
+            [4, 0.5, 4, 'models/bunny.obj', 0.08, [0.2, 0.8, 0.2]], // Green bunny - corner area
+            [28, 0.5, 4, 'models/dragon.obj', 0.06, [0.2, 0.2, 0.8]], // Blue dragon - opposite corner
+            [4, 0.5, 28, 'models/head.obj', 0.03, [0.8, 0.8, 0.2]], // Yellow head - far corner
+            [28, 0.5, 28, 'models/teapot.obj', 0.07, [0.8, 0.2, 0.8]], // Purple teapot - far corner
+            [16, 0.5, 2, 'models/trumpet.obj', 0.03, [0.2, 0.8, 0.8]], // Cyan trumpet - near entrance
         ];
         
         collectibleData.forEach((data, index) => {
             const [x, y, z, modelPath, scale, color] = data;
+            
+            console.log(`Creating collectible ${index}: ${modelPath} at position [${x}, ${y}, ${z}] with scale ${scale}`);
             
             const collectible = {
                 id: index,
@@ -48,6 +50,15 @@ export class CollectibleSystem {
                 collected: false,
                 rotationY: 0,
                 glowIntensity: 1.0
+            };
+            
+            // Add a load event listener to the model to see when it's ready
+            const originalOnLoad = collectible.model.onLoad;
+            collectible.model.onLoad = () => {
+                if (originalOnLoad) originalOnLoad();
+                console.log(`Model loaded successfully: ${modelPath}`);
+                console.log(`Vertices: ${collectible.model.vertices ? collectible.model.vertices.length : 'undefined'}`);
+                console.log(`Indices: ${collectible.model.indices ? collectible.model.indices.length : 'undefined'}`);
             };
             
             // Set initial transform with the smaller scale
