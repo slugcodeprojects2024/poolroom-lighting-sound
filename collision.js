@@ -59,7 +59,7 @@ export class CollisionHandler {
             return;
         }
         
-        // Add collision for all cubes including pillars
+        // Add collision for all cubes including pillars AND CEILING
         if (this.poolRoom.cubes) {
             for (const cube of this.poolRoom.cubes) {
                 // Get cube position and scale from its matrix
@@ -73,7 +73,7 @@ export class CollisionHandler {
                 const scaleY = Math.sqrt(matrix[4] * matrix[4] + matrix[5] * matrix[5] + matrix[6] * matrix[6]);
                 const scaleZ = Math.sqrt(matrix[8] * matrix[8] + matrix[9] * matrix[9] + matrix[10] * matrix[10]);
                 
-                // Create collision box for this cube
+                // Create collision box for this cube (INCLUDING CEILING)
                 this.collisionBoxes.push({
                     minX: posX - scaleX/2,
                     maxX: posX + scaleX/2,
@@ -81,8 +81,13 @@ export class CollisionHandler {
                     maxY: posY + scaleY/2,
                     minZ: posZ - scaleZ/2,
                     maxZ: posZ + scaleZ/2,
-                    type: cube.type // Keep track of cube type for debugging
+                    type: cube.type || 'unknown' // Keep track of cube type for debugging
                 });
+                
+                // Debug logging for ceiling cubes
+                if (cube.type === 'ceiling') {
+                    console.log(`Added ceiling collision at Y: ${posY}, bounds: ${posY - scaleY/2} to ${posY + scaleY/2}`);
+                }
             }
         }
         
@@ -173,6 +178,12 @@ export class CollisionHandler {
             minZ: -balconyWidth,
             maxZ: this.poolRoom.mapSize + balconyWidth
         });
+
+        console.log(`Initialized ${this.collisionBoxes.length} collision boxes`);
+        
+        // Count ceiling collision boxes for debugging
+        const ceilingBoxes = this.collisionBoxes.filter(box => box.type === 'ceiling');
+        console.log(`Added ${ceilingBoxes.length} ceiling collision boxes`);
     }
     
     // Check collision with walls - returns adjusted position
@@ -184,7 +195,6 @@ export class CollisionHandler {
         
         // Check pool wall collisions first
         for (const wall of this.poolWalls) {
-            // If this wall has a window opening at this position, skip collision
             if (this.isWindowOpening(newPosition, wall)) continue;
 
             if (newPosition[0] + radius > wall.minX && 
@@ -198,12 +208,10 @@ export class CollisionHandler {
         }
         
         // CRITICAL FIX: First check if we're below the pool bottom
-        // If we're in the pool area and below -1.1, teleport immediately back up
         if (this.isPositionAbovePool(newPosition[0], newPosition[2]) && newPosition[1] < -1.1) {
             console.log('Emergency fix: Found player below pool floor, teleporting up');
-            newPosition[1] = -0.7; // Place just below water surface
+            newPosition[1] = -0.7;
             
-            // Reset velocity to prevent continued falling
             if (window.camera && window.camera.velocity) {
                 window.camera.velocity.elements[1] = 0;
             }
@@ -212,15 +220,15 @@ export class CollisionHandler {
         }
         
         // Allow walking onto the balcony by expanding the world bounds
-        const balconyExtension = 2.0; // adjust as needed
-
+        const balconyExtension = 2.0;
+    
         const isOutsideWorld = (
             newPosition[0] < -balconyExtension ||
             newPosition[0] > this.poolRoom.mapSize - 1 + balconyExtension ||
             newPosition[2] < -balconyExtension ||
             newPosition[2] > this.poolRoom.mapSize - 1 + balconyExtension
         );
-
+    
         if (isOutsideWorld) {
             console.log('Preventing falling outside world');
             return previousPosition;
@@ -253,26 +261,24 @@ export class CollisionHandler {
         // Check Y movement (for jumping/falling)
         testPos = [newPosition[0], newPosition[1], newPosition[2]];
         if (this.isPositionColliding(testPos, effectiveRadius)) {
-            const poolBottom = -1.0; // Pool bottom Y-coordinate
+            const poolBottom = -1.0;
             if (newPosition[1] < poolBottom + effectiveRadius) {
                 console.log("Correcting position to pool bottom");
-                newPosition[1] = poolBottom + effectiveRadius; // Stop at the pool bottom
+                newPosition[1] = poolBottom + effectiveRadius;
             } else {
-                newPosition[1] = previousPosition[1]; // Revert to previous position
+                newPosition[1] = previousPosition[1];
             }
         }
-
-        // Add this critical emergency prevention code after the collision checks
-        // Super safety check - if somehow still falling through, teleport back up
+    
+        // Super safety check
         if (this.isPositionAbovePool(newPosition[0], newPosition[2]) && newPosition[1] < -1.5) {
             console.log('Emergency prevention: Teleporting from below pool');
-            newPosition[1] = -0.8; // Just below water surface
-            // Reset velocity
+            newPosition[1] = -0.8;
             if (window.camera && window.camera.velocity) {
                 window.camera.velocity.elements[1] = 0;
             }
         }
-
+    
         return newPosition;
     }
     
@@ -340,6 +346,28 @@ export class CollisionHandler {
             }
         }
         // Add more checks for other windows as needed
+        return false;
+    }
+
+    // Also add this helper method to better detect ceiling collisions:
+    isCollidingWithCeiling(position, radius) {
+        const testY = position[1] + radius; // Top of player
+        
+        for (const box of this.collisionBoxes) {
+            if (box.type === 'ceiling') {
+                // Check if player's head would hit this ceiling box
+                if (position[0] + radius > box.minX &&
+                    position[0] - radius < box.maxX &&
+                    testY >= box.minY && // Player's head is at or below ceiling top
+                    position[1] - radius < box.maxY && // Player's feet are above ceiling bottom (ensures overlap)
+                    position[2] + radius > box.minZ &&
+                    position[2] - radius < box.maxZ) {
+                    
+                    console.log(`Ceiling collision detected by isCollidingWithCeiling at Y: ${testY}, ceiling bounds: ${box.minY} to ${box.maxY}`);
+                    return true;
+                }
+            }
+        }
         return false;
     }
 }

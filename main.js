@@ -303,6 +303,10 @@ function processInput(deltaTime) {
     if (isOnLadder && nearLadder) {
         // LADDER CLIMBING MODE
         
+        // IMPORTANT: Disable collision detection while climbing
+        const originalCollisionState = collisionHandler.enabled;
+        collisionHandler.enabled = false;
+        
         // Override gravity/physics while on ladder
         if (camera.velocity && camera.velocity.elements) {
             camera.velocity.elements[1] = 0; // Stop falling
@@ -321,12 +325,16 @@ function processInput(deltaTime) {
         camera.position.elements[0] = ladderMatrix[12];
         camera.position.elements[2] = ladderMatrix[14];
         
-        // Height limits
-        if (camera.position.elements[1] < 0.6) {
-            camera.position.elements[1] = 0.6;
+        // Height limits - allow climbing to the actual roof level
+        const minHeight = 0.6;  // Ground level + eye height
+        const maxHeight = poolRoom.maxHeight + 1.5;  // Allow climbing onto the roof
+        
+        if (camera.position.elements[1] < minHeight) {
+            camera.position.elements[1] = minHeight;
         }
-        if (camera.position.elements[1] > 6.0) {
-            camera.position.elements[1] = 6.0;
+        if (camera.position.elements[1] > maxHeight) {
+            camera.position.elements[1] = maxHeight;
+            console.log('Reached maximum climbing height - you can step off the ladder now');
         }
         
         // Update camera vectors
@@ -334,10 +342,14 @@ function processInput(deltaTime) {
             camera.updateCameraVectors();
         }
         
+        // Re-enable collision for next frame
+        collisionHandler.enabled = originalCollisionState;
+        
     } else {
         // NORMAL MOVEMENT MODE
         if (isOnLadder) {
             isOnLadder = false; // Lost ladder contact
+            console.log('Left ladder - normal movement resumed');
         }
         
         // WASD keys for movement
